@@ -117,7 +117,7 @@
  * BL2U specific defines.
  */
 #define BL2U_BASE			BL2_BASE
-#define BL2U_LIMIT			(BL2U_BASE + 0x10000)
+#define BL2U_LIMIT			(BL2U_BASE + 0x20000)
 
 /*
  * BL31 specific defines.

@@ -61,15 +61,24 @@
 #define PL011_UART_CLK_IN_HZ		19200000
 
 #define HIKEY_MMC_DESC_BASE		(DDR_BASE + 0x01000000)
+/*
+ * HIKEY_MMC_DATA_BASE & HIKEY_MMC_DATA_SIZE are shared between fastboot
+ * and emmc driver. Since it could avoid to memory copy.
+ */
 #define HIKEY_MMC_DATA_BASE		(DDR_BASE + 0x10000000)
 #define HIKEY_MMC_DATA_SIZE		0x10000000
 #define HIKEY_NS_IMAGE_OFFSET		(DDR_BASE + 0x35000000)
+#define HIKEY_BL1_MMC_DESC_BASE		(XG2RAM0_BASE + 0x00067000)
+#define HIKEY_BL1_MMC_DATA_BASE		(XG2RAM0_BASE + 0x00068000)
+#define HIKEY_BL1_MMC_DATA_SIZE		0x00020000
 
 #define MMC_BASE			0
 #define HIKEY_FIP_BASE			(MMC_BASE + (4 << 20))
 #define HIKEY_FIP_MAX_SIZE		(8 << 20)
 #define HIKEY_NSBL1U_BASE		(MMC_BASE + 0)
 #define HIKEY_NSBL1U_MAX_SIZE		(32 << 10)
+#define HIKEY_BL2U_BASE			(MMC_BASE + 0)
+#define HIKEY_BL2U_MAX_SIZE		(4 << 30)
 
 /*
  * GIC400 interrupt handling related constants

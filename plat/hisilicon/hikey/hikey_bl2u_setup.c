@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2014-2016, Linaro Ltd and Contributors. All rights reserved.
- * Copyright (c) 2014-2016, Hisilicon Ltd and Contributors. All rights reserved.
+ * Copyright (c) 2016, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,7 +32,14 @@
 #include <bl_common.h>
 #include <console.h>
 #include <debug.h>
+#include <dw_mmc.h>
+#include <emmc.h>
 #include <errno.h>
+#include <fastboot.h>
+#include <hi6220.h>
+#include <partition.h>
+#include <pl061_gpio.h>
+#include <sp804_delay_timer.h>
 
 #include "hikey_def.h"
 #include "hikey_private.h"
@@ -66,13 +72,83 @@ void bl2u_early_platform_setup(void)
 void bl2u_plat_arch_setup(void)
 {
 	hikey_init_mmu_el1(BL2U_RO_LIMIT,
-			   BL31_LIMIT,
+			   BL31_LIMIT - BL2U_RO_LIMIT,
 			   BL2U_RO_BASE,
 			   BL2U_RO_LIMIT,
 			   BL2U_COHERENT_RAM_BASE,
 			   BL2U_COHERENT_RAM_LIMIT);
 }
 
+static void hikey_gpio_init(void)
+{
+	pl061_gpio_init();
+	pl061_gpio_register(GPIO0_BASE, 0);
+	pl061_gpio_register(GPIO1_BASE, 1);
+	pl061_gpio_register(GPIO2_BASE, 2);
+	pl061_gpio_register(GPIO3_BASE, 3);
+	pl061_gpio_register(GPIO4_BASE, 4);
+	pl061_gpio_register(GPIO5_BASE, 5);
+	pl061_gpio_register(GPIO6_BASE, 6);
+	pl061_gpio_register(GPIO7_BASE, 7);
+	pl061_gpio_register(GPIO8_BASE, 8);
+	pl061_gpio_register(GPIO9_BASE, 9);
+	pl061_gpio_register(GPIO10_BASE, 10);
+	pl061_gpio_register(GPIO11_BASE, 11);
+	pl061_gpio_register(GPIO12_BASE, 12);
+	pl061_gpio_register(GPIO13_BASE, 13);
+	pl061_gpio_register(GPIO14_BASE, 14);
+	pl061_gpio_register(GPIO15_BASE, 15);
+	pl061_gpio_register(GPIO16_BASE, 16);
+	pl061_gpio_register(GPIO17_BASE, 17);
+	pl061_gpio_register(GPIO18_BASE, 18);
+	pl061_gpio_register(GPIO19_BASE, 19);
+
+	/* Power on indicator LED (USER_LED1). */
+	gpio_set_direction(32, GPIO_DIR_OUT);	/* LED1 */
+	gpio_set_value(32, GPIO_LEVEL_HIGH);
+	gpio_set_direction(33, GPIO_DIR_OUT);	/* LED2 */
+	gpio_set_value(33, GPIO_LEVEL_LOW);
+	gpio_set_direction(34, GPIO_DIR_OUT);	/* LED3 */
+	gpio_set_direction(35, GPIO_DIR_OUT);	/* LED4 */
+}
+
 void bl2u_platform_setup(void)
 {
+	dw_mmc_params_t dw_params;
+	fastboot_params_t fb_params;
+	partition_ops_t partition_ops;
+	char response[16];
+
+	sp804_timer_init(SP804_TIMER0_BASE, 10, 192);
+	hikey_gpio_init();
+
+	dw_params.reg_base = 0xf723d000;
+	dw_params.desc_base = HIKEY_MMC_DESC_BASE;
+	dw_params.desc_size = 1 << 20;
+	dw_params.clk_rate = 24 * 1000 * 1000;
+	dw_params.bus_width = EMMC_BUS_WIDTH_8;
+	dw_params.cmd23 = 1;
+	dw_mmc_init(&dw_params);
+	hikey_io_setup();
+	partition_ops.handler = hikey_partition_table_handler;
+	partition_init(BL2U_IMAGE_ID, &partition_ops);
+
+	hikey_init_serialno();
+	/* Initiailize the fastboot variable "max-download-size". */
+	fb_params.base = HIKEY_MMC_DATA_BASE;
+	fb_params.size = HIKEY_MMC_DATA_SIZE;
+	fb_params.image_id = BL2U_IMAGE_ID;
+	sprintf(response, "0x%x", HIKEY_MMC_DATA_SIZE);
+	fastboot_set_var(FASTBOOT_VAR_MAX_DOWNLOAD_SIZE, response, NULL);
+	fastboot_set_var(FASTBOOT_VAR_VERSION, "1.0", NULL);
+	fastboot_set_var(FASTBOOT_VAR_PRODUCT, "hikey", NULL);
+	fastboot_set_var(FASTBOOT_VAR_PARTITION_TYPE, "",
+			 hikey_get_partition_type);
+	fastboot_set_var(FASTBOOT_VAR_PARTITION_SIZE, "",
+			 hikey_get_partition_size);
+	fastboot_register_command(FASTBOOT_COMMAND_REBOOT, hikey_reboot);
+	fastboot_register_command(FASTBOOT_COMMAND_OEM, hikey_oem);
+	fastboot_register_command(FASTBOOT_COMMAND_FLASH, hikey_flash);
+	fastboot_register_command(FASTBOOT_COMMAND_ERASE, hikey_erase);
+	fastboot_run(&fb_params);
 }
