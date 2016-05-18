@@ -216,7 +216,6 @@ static int block_read(io_entity_t *entity, uintptr_t buffer, size_t length,
 	do {
 		lba = (cur->file_pos + cur->base) / block_size;
 		if (left >= buf->length) {
-#if 0
 			/* Since left is larger, it's impossible to padding. */
 			if (skip) {
 				/*
@@ -241,16 +240,8 @@ static int block_read(io_entity_t *entity, uintptr_t buffer, size_t length,
 				       (void *)(buf->offset + skip),
 				       count - skip);
 			}
-#else
-			count = ops->read(lba, buf->offset, buf->length);
-			assert(count == buf->length);
-			cur->file_pos += count - skip;
-			memcpy((void *)buffer, (void *)(buf->offset + skip),
-			       count - skip);
-#endif
 			left = left - (count - skip);
 		} else {
-#if 0
 			if (skip || padding) {
 				/*
 				 * The beginning address (file_pos) isn't
@@ -274,14 +265,6 @@ static int block_read(io_entity_t *entity, uintptr_t buffer, size_t length,
 				       (void *)(buf->offset + skip),
 				       left);
 			}
-#else
-			count = ops->read(lba, buf->offset, left);
-			assert(count == left);
-			left = left - (skip + padding);
-			cur->file_pos += left;
-			memcpy((void *)buffer, (void *)(buf->offset + skip),
-			       left);
-#endif
 			/* It's already the last block operation */
 			left = 0;
 		}
