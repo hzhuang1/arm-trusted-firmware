@@ -54,4 +54,6 @@ void hikey_pll_init(void);
 void hikey_ddr_init(void);
 void hikey_io_setup(void);
 
+extern void usb_download(void);
+
 #endif /* __HIKEY_PRIVATE_H__ */

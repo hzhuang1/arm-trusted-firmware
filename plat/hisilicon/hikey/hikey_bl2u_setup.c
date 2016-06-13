@@ -75,4 +75,5 @@ void bl2u_plat_arch_setup(void)
 
 void bl2u_platform_setup(void)
 {
+	usb_download();
 }
