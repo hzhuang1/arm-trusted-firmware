@@ -34,6 +34,8 @@
 #include <console.h>
 #include <debug.h>
 #include <errno.h>
+#include <hi6220.h>
+#include <sp804_delay_timer.h>
 
 #include "hikey_def.h"
 #include "hikey_private.h"
@@ -66,7 +68,7 @@ void bl2u_early_platform_setup(void)
 void bl2u_plat_arch_setup(void)
 {
 	hikey_init_mmu_el1(BL2U_RO_LIMIT,
-			   BL31_LIMIT,
+			   BL31_LIMIT - BL2U_RO_LIMIT,
 			   BL2U_RO_BASE,
 			   BL2U_RO_LIMIT,
 			   BL2U_COHERENT_RAM_BASE,
@@ -75,5 +77,6 @@ void bl2u_plat_arch_setup(void)
 
 void bl2u_platform_setup(void)
 {
+	sp804_timer_init(SP804_TIMER0_BASE, 10, 192);
 	usb_download();
 }

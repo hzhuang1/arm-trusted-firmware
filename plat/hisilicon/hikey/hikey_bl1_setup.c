@@ -344,7 +344,7 @@ void bl1_platform_setup(void)
  */
 unsigned int bl1_plat_get_next_image_id(void)
 {
-#if 0
+#if 1
 	int32_t boot_mode;
 	unsigned int ret;
 
