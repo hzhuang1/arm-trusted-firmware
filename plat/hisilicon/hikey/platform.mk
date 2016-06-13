@@ -71,6 +71,7 @@ BL1_SOURCES		+=	bl1/tbbr/tbbr_img_desc.c		\
 BL2U_SOURCES		+=	drivers/arm/pl061/pl061_gpio.c		\
 				drivers/arm/sp804/sp804_delay_timer.c	\
 				drivers/delay_timer/delay_timer.c	\
+				drivers/fastboot/fastboot.c		\
 				drivers/gpio/gpio.c			\
 				drivers/io/io_block.c			\
 				drivers/io/io_fip.c			\

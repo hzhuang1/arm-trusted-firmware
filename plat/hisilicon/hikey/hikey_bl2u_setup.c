@@ -34,6 +34,7 @@
 #include <console.h>
 #include <debug.h>
 #include <errno.h>
+#include <fastboot.h>
 #include <hi6220.h>
 #include <sp804_delay_timer.h>
 
@@ -78,5 +79,9 @@ void bl2u_plat_arch_setup(void)
 void bl2u_platform_setup(void)
 {
 	sp804_timer_init(SP804_TIMER0_BASE, 10, 192);
+#if 0
 	usb_download();
+#else
+	fastboot_run();
+#endif
 }

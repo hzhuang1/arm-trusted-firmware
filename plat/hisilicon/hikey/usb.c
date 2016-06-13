@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <debug.h>
+#include <fastboot.h>
 #include <gpio.h>
 #include <hi6220.h>
 #include <mmio.h>
@@ -1478,6 +1479,7 @@ void usb_reinit()
 	}
 }
 
+#if 0
 void usb_download(void)
 {
 	usbloader_init();
@@ -1487,3 +1489,15 @@ void usb_download(void)
 		//usb_reinit();
 	}
 }
+#else
+int fastboot_device_is_attached(void)
+{
+	usbloader_init();
+	return 0;
+}
+
+void fastboot_device_handle_interrupts(void)
+{
+	usb_poll();
+}
+#endif
