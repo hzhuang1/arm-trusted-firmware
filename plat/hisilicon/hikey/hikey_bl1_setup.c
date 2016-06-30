@@ -308,6 +308,15 @@ static void hikey_hi6553_init(void)
 }
 
 /*
+ * Initialize the permission to access SRAM by DMA.
+ */
+static void hikey_sram_init(void)
+{
+	mmio_write_32(0xf8002870, 1 << 1);
+	mmio_write_32(0xf8002828, 1 << 0);
+}
+
+/*
  * Function which will perform any remaining platform-specific setup that can
  * occur after the MMU and data cache have been enabled.
  */
@@ -321,6 +330,7 @@ void bl1_platform_setup(void)
 	hikey_hi6553_init();
 
 	hikey_pll_init();
+	hikey_sram_init();
 
 	hikey_ddr_init();
 
@@ -344,7 +354,7 @@ void bl1_platform_setup(void)
  */
 unsigned int bl1_plat_get_next_image_id(void)
 {
-#if 1
+#if 0
 	int32_t boot_mode;
 	unsigned int ret;
 
