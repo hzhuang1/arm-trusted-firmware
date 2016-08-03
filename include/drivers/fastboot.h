@@ -89,7 +89,6 @@ extern void fb_download(char *cmdbuf);
 extern void fb_flash(char *cmdbuf);
 extern void fb_reboot(char *cmdbuf);
 extern void fb_getvar(char *cmdbuf);
-extern void tx_status(const char *status);
 extern void rx_cmd(void);
 extern void rx_data(void);
 extern int fastboot_handle_command(void *buf, int length);

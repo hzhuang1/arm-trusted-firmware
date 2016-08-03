@@ -337,6 +337,8 @@ struct usb_request {
 #define DCFG_NZ_STS_OUT_HSHK		(1 << 2)
 
 #define DCTL        		(DWC_OTG_BASE + 0x804)
+#define DCTL_CGNPINNAK		(1 << 8)
+
 #define DSTS        		(DWC_OTG_BASE + 0x808)
 #define DIEPMSK     		(DWC_OTG_BASE + 0x810)
 #define DOEPMSK     		(DWC_OTG_BASE + 0x814)
@@ -424,8 +426,6 @@ struct usb_request {
 #define DIEPTSIZ15  		(DWC_OTG_BASE + 0xAF0)
 #define DIEPDMA15   		(DWC_OTG_BASE + 0xAF4)
 
-#define DIEPINT_XFERCOMPL		(1 << 0)
-
 /* Device Logical OUT Endpoint-Specific Registers */
 #define DOEPCTL(x)  		(DWC_OTG_BASE + 0xB00 + 0x20 * (x))
 #define DXEPCTL_EPENA			(1 << 31)
@@ -447,6 +447,7 @@ struct usb_request {
 
 
 #define DOEPINT(x)  		(DWC_OTG_BASE + 0xB08 + 0x20 * (x))
+#define DXEPINT_NAKINTRPT		(1 << 13)
 #define DXEPINT_INEPNAKEFF              (1 << 6)
 #define DXEPINT_BACK2BACKSETUP          (1 << 6)
 #define DXEPINT_INTKNEPMIS              (1 << 5)

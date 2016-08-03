@@ -51,6 +51,8 @@
 
 #define FB_DOWNLOAD_BASE	0x20000000
 
+#define DW_UDC_TIMEOUT			10000
+
 struct ep_type {
 	unsigned char		active;
 	unsigned char		busy;
@@ -412,142 +414,6 @@ void usb_drv_cancel_all_transfers(void)
 	reset_endpoints();
 }
 
-int hiusb_epx_tx(unsigned ep, void *buf, unsigned len)
-{
-	int blocksize,packets;
-	unsigned int epints;
-	unsigned int cycle = 0;
-	unsigned int data;
-
-	endpoints[ep].busy = 1;		//true
-	endpoints[ep].size = len;
-
-	while (mmio_read_32(GINTSTS) & 0x40) {
-		data = mmio_read_32(DCTL);
-		data |= 0x100;
-		mmio_write_32(DCTL, data);
-	}
-
-	data = mmio_read_32(DIEPCTL(ep));
-	data |= 0x08000000;
-	mmio_write_32(DIEPCTL(ep), data);
-
-	/* EPx OUT ACTIVE */
-	mmio_write_32(DIEPCTL(ep), data | 0x8000);
-	if (!ep) {
-		blocksize = 64;
-	} else {
-		blocksize = usb_drv_port_speed() ? USB_BLOCK_HIGH_SPEED_SIZE : 64;
-	}
-	packets = (len + blocksize - 1) / blocksize;
-
-	if (!len) {
-		/* one empty packet */
-		mmio_write_32(DIEPTSIZ(ep), 1 << 19);
-		/* NULL */
-		dma_desc_in.status.b.bs = 0x3;
-		dma_desc_in.status.b.l = 1;
-		dma_desc_in.status.b.ioc = 1;
-		dma_desc_in.status.b.sp = last_one;
-		dma_desc_in.status.b.bytes = 0;
-		dma_desc_in.buf = 0;
-		dma_desc_in.status.b.sts = 0;
-		dma_desc_in.status.b.bs = 0x0;
-		mmio_write_32(DIEPDMA(ep), (unsigned long)&dma_desc_in);
-	} else {
-		mmio_write_32(DIEPTSIZ(ep), len | (packets << 19));
-		dma_desc_in.status.b.bs = 0x3;
-		dma_desc_in.status.b.l = 1;
-		dma_desc_in.status.b.ioc = 1;
-		dma_desc_in.status.b.sp = last_one;
-		dma_desc_in.status.b.bytes = len;
-		dma_desc_in.buf = (unsigned long)buf;
-		dma_desc_in.status.b.sts = 0;
-		dma_desc_in.status.b.bs = 0x0;
-		mmio_write_32(DIEPDMA(ep), (unsigned long)&dma_desc_in);
-	}
-
-	cycle = 0;
-	while(1){
-		data = mmio_read_32(DIEPINT(ep));
-		if ((data & 0x2000) || (cycle > 10000)) {
-			if (cycle > 10000) {
-				NOTICE("Phase 2:ep(%d) status, DIEPCTL(%d) is [0x%x],"
-				       "DTXFSTS(%d) is [0x%x], DIEPINT(%d) is [0x%x],"
-				       "DIEPTSIZ(%d) is [0x%x] GINTSTS is [0x%x]\n",
-					ep, ep, data,
-					ep, mmio_read_32(DTXFSTS(ep)),
-					ep, mmio_read_32(DIEPINT(ep)),
-					ep, mmio_read_32(DIEPTSIZ(ep)),
-					mmio_read_32(GINTSTS));
-			}
-			break;
-		}
-
-		cycle++;
-		udelay(10);
-	}
-	VERBOSE("ep(%d) enable, DIEPCTL(%d) is [0x%x], DTXFSTS(%d) is [0x%x],"
-		"DIEPINT(%d) is [0x%x], DIEPTSIZ(%d) is [0x%x] \n",
-		ep, ep, mmio_read_32(DIEPCTL(ep)),
-		ep, mmio_read_32(DTXFSTS(ep)),
-		ep, mmio_read_32(DIEPINT(ep)),
-		ep, mmio_read_32(DIEPTSIZ(ep)));
-
-	__asm__ volatile("dsb	sy\n"
-			 "isb	sy\n");
-	data = mmio_read_32(DIEPCTL(ep));
-	data |= 0x84000000;
-	/* epena & cnak*/
-	mmio_write_32(DIEPCTL(ep), data);
-	__asm__ volatile("dsb	sy\n"
-			 "isb	sy\n");
-
-	cycle = 0;
-	while (1) {
-		epints = mmio_read_32(DIEPINT(ep)) & 1;
-		if ((mmio_read_32(GINTSTS) & 0x40000) && epints) {
-			VERBOSE("Tx succ:ep(%d), DTXFSTS(%d) is [0x%x] \n",
-				ep, ep, mmio_read_32(DTXFSTS(ep)));
-			mmio_write_32(DIEPINT(ep), epints);
-			if (endpoints[ep].busy) {
-				endpoints[ep].busy = 0;//false
-				endpoints[ep].rc = 0;
-				endpoints[ep].done = 1;//true
-			}
-			break;
-		}
-		cycle++;
-		udelay(10);
-		VERBOSE("loop for intr: ep(%d), DIEPCTL(%d) is [0x%x], ",
-			"DTXFSTS(%d) is [0x%x], DIEPINT(%d) is [0x%x] \n",
-			ep, ep, mmio_read_32(DIEPCTL(ep)),
-			ep, mmio_read_32(DTXFSTS(ep)),
-			ep, mmio_read_32(DIEPINT(ep)));
-
-		if (cycle > 1000000) {
-			WARN("Wait IOC intr over 10s! USB will reset\n");
-			usb_need_reset = 1;
-			return 1;
-		}
-	}
-
-	cycle = 0;
-	while (1) {
-		if ((mmio_read_32(DIEPINT(ep)) & 0x2000) || (cycle > 100000)) {
-			if (cycle > 100000){
-				WARN("all wait cycle is [%d]\n",cycle);
-			}
-			break;
-		}
-
-		cycle++;
-		udelay(10);
-	}
-
-	return 0;
-}
-
 int hiusb_epx_rx(unsigned ep, void *buf, unsigned len)
 {
 	unsigned int blocksize = 0, data;
@@ -622,7 +488,7 @@ int hiusb_epx_rx(unsigned ep, void *buf, unsigned len)
 int usb_queue_req(struct usb_endpoint *ept, struct usb_request *req)
 {
 	if (ept->in)
-		hiusb_epx_tx(ept->num, req->buf, req->length);
+		assert(0);
 	else
 		hiusb_epx_rx(ept->num, req->buf, req->length);
 
@@ -647,29 +513,6 @@ void rx_data(void)
 	req->complete = usb_rx_data_complete;
 	usb_queue_req(&ep1out, req);
 	rx_data_complete = 0;
-}
-
-void tx_status(const char *status)
-{
-	struct usb_request *req = &tx_req;
-	int len = strlen(status);
-
-	*(char *)((uintptr_t)req->buf + len) = '\0';	/* clean data for debugging */
-	memcpy(req->buf, status, (unsigned int)len);
-	req->length = (unsigned int)len;
-	req->complete = 0;
-	NOTICE("#%s, resp:%s\n", __func__, (char *)req->buf);
-	usb_queue_req(&ep1in, req);
-}
-
-void tx_dump_page(const char *ptr, int len)
-{
-	struct usb_request *req = &tx_req;
-
-	memcpy(req->buf, ptr, (unsigned int)len);
-	req->length = (unsigned int)len;
-	req->complete = 0;
-	usb_queue_req(&ep1in, req);
 }
 
 
@@ -1315,7 +1158,7 @@ void dw_udc_wait_tx(void)
 		daint = mmio_read_32(DAINT);
 		INFO("#%s, epints:0x%x daint:0x%x\n", __func__, epints, daint);
 
-		if ((epints & DIEPINT_XFERCOMPL) && (daint & DAINT_INEP(1))) {
+		if ((epints & DXEPINT_XFERCOMPL) && (daint & DAINT_INEP(1))) {
 			INFO("IN EP event,ints:0x%x, DIEPINT0:%x, DAINT:%x, DAINTMSK:%x.\n",
 			ints, epints, mmio_read_32(DAINT), mmio_read_32(DAINTMSK));
 			INFO("TX completed.DIEPTSIZ(0) = 0x%x.\n", mmio_read_32(DIEPTSIZ0));
@@ -1345,6 +1188,126 @@ void dw_udc_wait_tx(void)
 	}
 }
 
+void dw_udc_epx_tx(int ep, void *buf, int len)
+{
+	/*
+	int blocksize,packets;
+	unsigned int epints;
+	unsigned int cycle = 0;
+	*/
+	int tx_size, timeout, packets;
+	unsigned int data;
+
+	endpoints[ep].busy = 1;
+	endpoints[ep].size = len;
+
+	/* clear EPx IN NAK status */
+	while (mmio_read_32(GINTSTS) & GINTSTS_GINNAKEFF) {
+		data = mmio_read_32(DCTL) | DCTL_CGNPINNAK;
+		mmio_write_32(DCTL, data);
+	}
+
+	/* enable NAK for setup packet */
+	data = mmio_read_32(DIEPCTL(ep)) | DXEPCTL_SNAK;
+	mmio_write_32(DIEPCTL(ep), data);
+
+	if (ep == 0) {
+		tx_size = 64;
+	} else {
+		if (usb_drv_port_speed()) {
+			tx_size = USB_BLOCK_HIGH_SPEED_SIZE;
+		} else {
+			tx_size = 64;
+		}
+	}
+	packets = (len + tx_size - 1) / tx_size;
+
+	if (len == 0) {
+		/* one empty packet */
+		mmio_write_32(DIEPTSIZ(ep), DXEPTSIZ_PKTCNT(1));
+		dma_desc_in.buf = 0;
+	} else {
+		mmio_write_32(DIEPTSIZ(ep), len | DXEPTSIZ_PKTCNT(packets));
+		dma_desc_in.buf = (unsigned long)buf;
+	}
+	dma_desc_in.status.b.bs = 0x3;
+	dma_desc_in.status.b.l = 1;
+	dma_desc_in.status.b.ioc = 1;
+	dma_desc_in.status.b.sp = last_one;
+	dma_desc_in.status.b.bytes = len;
+	dma_desc_in.status.b.sts = 0;
+	dma_desc_in.status.b.bs = 0x0;
+	mmio_write_32(DIEPDMA(ep), (unsigned long)&dma_desc_in);
+
+	/* wait for NAK interrupt */
+	timeout = DW_UDC_TIMEOUT;
+	while (timeout--) {
+		data = mmio_read_32(DIEPINT(ep));
+		if (data & DXEPINT_NAKINTRPT)
+			break;
+		udelay(10);
+	}
+	if (timeout == 0) {
+		WARN("DIEPCTL(%d):0x%x, DTXFSTS(%d):0x%x, "
+		     "DIEPINT(%d):0x%x, DIEPTSIZ(%d):0x%x, "
+		     "GINTSTS:0x%x\n",
+		     ep, mmio_read_32(DIEPCTL(ep)),
+		     ep, mmio_read_32(DTXFSTS(ep)),
+		     ep, mmio_read_32(DIEPINT(ep)),
+		     ep, mmio_read_32(DIEPTSIZ(ep)),
+		     mmio_read_32(GINTSTS));
+	}
+	dsb();
+	isb();
+
+	data = mmio_read_32(DIEPCTL(ep));
+	data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
+	mmio_write_32(DIEPCTL(ep), data);
+	dsb();
+	isb();
+
+	/* wait for EP transmission completed */
+	timeout = DW_UDC_TIMEOUT;
+	while (timeout--) {
+		if ((mmio_read_32(GINTSTS) & GINTSTS_IEPINT) == 0)
+			continue;
+		data = mmio_read_32(DIEPINT(ep));
+		if (data & DXEPINT_XFERCOMPL) {
+			mmio_write_32(DIEPINT(ep), DXEPINT_XFERCOMPL);
+			if (endpoints[ep].busy) {
+				endpoints[ep].busy = 0;
+				endpoints[ep].rc = 0;
+				endpoints[ep].done = 1;
+			}
+			break;
+		}
+		udelay(10);
+	}
+	if (timeout == 0) {
+		WARN("Wait EP%d interrupt over 10 seconds! USB need reset.\n",
+		     ep);
+		assert(0);
+	}
+
+	timeout = DW_UDC_TIMEOUT;
+	while (timeout--) {
+		data = mmio_read_32(DIEPINT(ep));
+		if (data & DXEPINT_NAKINTRPT)
+			break;
+		udelay(10);
+	}
+	if (timeout == 0) {
+		WARN("DIEPCTL(%d):0x%x, DTXFSTS(%d):0x%x, "
+		     "DIEPINT(%d):0x%x, DIEPTSIZ(%d):0x%x, "
+		     "GINTSTS:0x%x\n",
+		     ep, mmio_read_32(DIEPCTL(ep)),
+		     ep, mmio_read_32(DTXFSTS(ep)),
+		     ep, mmio_read_32(DIEPINT(ep)),
+		     ep, mmio_read_32(DIEPTSIZ(ep)),
+		     mmio_read_32(GINTSTS));
+	}
+}
+
 int dw_udc_read(size_t *size)
 {
 	return 0;
@@ -1357,8 +1320,7 @@ int dw_udc_write(char *buf, size_t size)
 	memcpy(tx_req.buf, buf, size + 1);
 	tx_req.length = size;
 	tx_req.complete = 0;
-	hiusb_epx_tx(ep1in.num, tx_req.buf, tx_req.length);
-	//dw_udc_wait_tx();
+	dw_udc_epx_tx(ep1in.num, tx_req.buf, tx_req.length);
 	return 0;
 }
 
