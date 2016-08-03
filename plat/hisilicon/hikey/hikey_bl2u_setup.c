@@ -33,6 +33,7 @@
 #include <console.h>
 #include <debug.h>
 #include <dw_mmc.h>
+#include <dw_udc.h>
 #include <emmc.h>
 #include <errno.h>
 #include <fastboot.h>
@@ -134,6 +135,7 @@ void bl2u_platform_setup(void)
 	partition_init(BL2U_IMAGE_ID, &partition_ops);
 
 	hikey_init_serialno();
+	dw_udc_init();
 	/* Initiailize the fastboot variable "max-download-size". */
 	fb_params.base = HIKEY_MMC_DATA_BASE;
 	fb_params.size = HIKEY_MMC_DATA_SIZE;

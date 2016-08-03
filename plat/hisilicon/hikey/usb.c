@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <debug.h>
+#include <dw_udc.h>
 #include <fastboot.h>
 #include <gpio.h>
 #include <hi6220.h>
@@ -1281,4 +1282,26 @@ int fastboot_device_is_attached(void)
 void fastboot_device_handle_interrupts(void)
 {
 	usb_poll();
+}
+
+
+int dw_udc_read(size_t *size)
+{
+	return 0;
+}
+
+int dw_udc_write(char *buf, size_t size)
+{
+	tx_status(buf);
+	return 0;
+}
+
+static fastboot_ops_t fb_ops = {
+	.read	= dw_udc_read,
+	.write	= dw_udc_write
+};
+
+void dw_udc_init(void)
+{
+	fastboot_init(&fb_ops);
 }

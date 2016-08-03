@@ -70,6 +70,11 @@ typedef struct fastboot_params {
 	unsigned int	image_id;
 } fastboot_params_t;
 
+typedef struct fastboot_ops {
+	int		(*read)(size_t *size);
+	int		(*write)(char *buf, size_t size);
+} fastboot_ops_t;
+
 int fastboot_run(fastboot_params_t *params);
 
 int fastboot_device_is_attached(void);
@@ -88,6 +93,7 @@ extern void tx_status(const char *status);
 extern void rx_cmd(void);
 extern void rx_data(void);
 extern int fastboot_handle_command(void *buf, int length);
+extern void fastboot_init(const fastboot_ops_t *ops_ptr);
 
 extern void debug_rx_info(uintptr_t buf, unsigned long len);
 extern int debug_rxdata_complete(void);

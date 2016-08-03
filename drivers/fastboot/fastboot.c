@@ -67,15 +67,16 @@ typedef enum {
 	STATE_ERROR
 } protocol_state;
 
-struct fastboot_handle {
+typedef struct fastboot_handle {
 	uintptr_t	io_dev_handle;
 	protocol_state	state;
-};
+	int		(*read)(size_t *size);
+	int		(*write)(char *buf, size_t size);
+} fastboot_handle_t;
 
 struct fastboot_cmd {
 	const char	*cmd;
-	void		(*execute)(struct fastboot_handle *handle,
-				   char *arg);
+	void		(*execute)(fastboot_handle_t *handle, char *arg);
 	int		(*callback)(const char *arg);
 };
 
@@ -85,17 +86,17 @@ struct fastboot_var {
 	int		(*execute)(const char *arg, int left, char *response);
 };
 
-static void cmd_boot(struct fastboot_handle *fb_handle, char *arg);
-static void cmd_continue(struct fastboot_handle *fb_handle, char *arg);
-static void cmd_download(struct fastboot_handle *fb_handle, char *arg);
-static void cmd_erase(struct fastboot_handle *fb_handle, char *arg);
-static void cmd_flash(struct fastboot_handle *fb_handle, char *arg);
-static void cmd_getvar(struct fastboot_handle *fb_handle, char *arg);
-static void cmd_oem(struct fastboot_handle *fb_handle, char *arg);
-static void cmd_reboot(struct fastboot_handle *fb_handle, char *arg);
+static void cmd_boot(fastboot_handle_t *handle, char *arg);
+static void cmd_continue(fastboot_handle_t *handle, char *arg);
+static void cmd_download(fastboot_handle_t *handle, char *arg);
+static void cmd_erase(fastboot_handle_t *handle, char *arg);
+static void cmd_flash(fastboot_handle_t *handle, char *arg);
+static void cmd_getvar(fastboot_handle_t *handle, char *arg);
+static void cmd_oem(fastboot_handle_t *handle, char *arg);
+static void cmd_reboot(fastboot_handle_t *handle, char *arg);
 
 static fastboot_params_t fb_params;
-static int fb_running;
+static fastboot_handle_t fb_handle;
 
 static struct fastboot_cmd cmds[] = {
 	[CMD_INDEX_BOOT] = {
@@ -186,13 +187,13 @@ unsigned long strtoul(const char *nptr, char **endptr, int base)
 	return data;
 }
 
-static void fastboot_ack(struct fastboot_handle *fb_handle, const char *code,
+static void fastboot_ack(fastboot_handle_t *handle, const char *code,
 			 const char *reason)
 {
 	char response[FASTBOOT_RESPONSE_LENGTH];
 	int len;
 
-	if (fb_handle->state != STATE_COMMAND) {
+	if (handle->state != STATE_COMMAND) {
 		assert(0);
 		return;
 	}
@@ -203,83 +204,83 @@ static void fastboot_ack(struct fastboot_handle *fb_handle, const char *code,
 		       code, reason);
 	response[len] = '\0';
 #if 0
-	fb_handle->state = STATE_COMPLETE;
-	fb_handle->handle_write(fb_handle, response, strlen(response));
+	handle->state = STATE_COMPLETE;
+	handle->handle_write(handle, response, strlen(response));
 #else
-	fb_handle->state = STATE_COMPLETE;
-	tx_status(response);
+	handle->state = STATE_COMPLETE;
+	handle->write(response, strlen(response));
 	rx_cmd();
 #endif
 }
 
-static void fastboot_okay(struct fastboot_handle *fb_handle, const char *info)
+static void fastboot_okay(fastboot_handle_t *handle, const char *info)
 {
-	fastboot_ack(fb_handle, "OKAY", info);
+	fastboot_ack(handle, "OKAY", info);
 }
 
-static void fastboot_fail(struct fastboot_handle *fb_handle, const char *reason)
+static void fastboot_fail(fastboot_handle_t *handle, const char *reason)
 {
-	fastboot_ack(fb_handle, "FAIL", reason);
+	fastboot_ack(handle, "FAIL", reason);
 }
 
-static void fastboot_data(struct fastboot_handle *fb_handle, const char *reason)
+static void fastboot_data(fastboot_handle_t *handle, const char *reason)
 {
 	char response[FASTBOOT_RESPONSE_LENGTH];
 
 	snprintf(response, FASTBOOT_RESPONSE_LENGTH, "DATA%s", reason);
-	tx_status(response);
+	handle->write(response, strlen(response));
 }
 
-static void fastboot_info(struct fastboot_handle *fb_handle, const char *reason)
+static void fastboot_info(fastboot_handle_t *handle, const char *reason)
 {
 	char response[FASTBOOT_RESPONSE_LENGTH];
 
 	snprintf(response, FASTBOOT_RESPONSE_LENGTH, "INFO%s", reason);
-	tx_status(response);
+	handle->write(response, strlen(response));
 }
 
-static void cmd_boot(struct fastboot_handle *fb_handle, char *arg)
+static void cmd_boot(fastboot_handle_t *handle, char *arg)
 {
-	fastboot_fail(fb_handle, "not supported");
+	fastboot_fail(handle, "not supported");
 }
 
-static void cmd_continue(struct fastboot_handle *fb_handle, char *arg)
+static void cmd_continue(fastboot_handle_t *handle, char *arg)
 {
+	fastboot_okay(handle, NULL);
 	/* exit fastboot protocol */
-	fb_running = 0;
-	fastboot_okay(fb_handle, NULL);
+	handle->state = STATE_OFFLINE;
 }
 
-static void cmd_download(struct fastboot_handle *fb_handle, char *arg)
+static void cmd_download(fastboot_handle_t *handle, char *arg)
 {
 	unsigned long size;
 	char response[FASTBOOT_RESPONSE_LENGTH];
 
 	if (arg[0] == '\0') {
-		fastboot_fail(fb_handle, "invalid parameter");
+		fastboot_fail(handle, "invalid parameter");
 		return;
 	}
 	size = strtoul(arg + 1, NULL, 16);		/* skip ':' */
 	if (size > fb_params.size) {
-		fastboot_fail(fb_handle, "file is too large");
+		fastboot_fail(handle, "file is too large");
 	} else {
 		snprintf(response, FASTBOOT_RESPONSE_LENGTH, "%08x",
 			 (uint32_t)size);
 		assert(fb_params.size >= size);
 		debug_rx_info(fb_params.base, size);
-		fastboot_data(fb_handle, response);
+		fastboot_data(handle, response);
 		rx_data();
 		for (;;) {
 			fastboot_device_handle_interrupts();
 			if (debug_rxdata_complete()) {
-				fastboot_okay(fb_handle, NULL);
+				fastboot_okay(handle, NULL);
 				break;
 			}
 		}
 	}
 }
 
-static void cmd_erase(struct fastboot_handle *fb_handle, char *arg)
+static void cmd_erase(fastboot_handle_t *handle, char *arg)
 {
 	int result = -EINVAL;
 
@@ -287,13 +288,13 @@ static void cmd_erase(struct fastboot_handle *fb_handle, char *arg)
 		result = cmds[CMD_INDEX_ERASE].callback(arg);
 	}
 	if (result != 0) {
-		fastboot_fail(fb_handle, "invalid parameter");
+		fastboot_fail(handle, "invalid parameter");
 	} else {
-		fastboot_okay(fb_handle, NULL);
+		fastboot_okay(handle, NULL);
 	}
 }
 
-static void cmd_flash(struct fastboot_handle *fb_handle, char *arg)
+static void cmd_flash(fastboot_handle_t *handle, char *arg)
 {
 	uintptr_t dev_handle, image_handle, image_spec = 0;
 	part_entry_t entry;
@@ -306,7 +307,7 @@ static void cmd_flash(struct fastboot_handle *fb_handle, char *arg)
 		if (result != 0) {
 			goto exit;
 		}
-		fastboot_okay(fb_handle, NULL);
+		fastboot_okay(handle, NULL);
 		return;
 	}
 	/* If callback() doesn't exist. */
@@ -331,7 +332,7 @@ static void cmd_flash(struct fastboot_handle *fb_handle, char *arg)
 	}
 	/* response status */
 	snprintf(response, FASTBOOT_RESPONSE_LENGTH, "writing flash");
-	fastboot_info(fb_handle, response);
+	fastboot_info(handle, response);
 
 	result = io_seek(image_handle, IO_SEEK_SET, entry.start);
 	if (result != 0) {
@@ -344,15 +345,15 @@ static void cmd_flash(struct fastboot_handle *fb_handle, char *arg)
 		goto exit_io;
 	}
 	io_close(image_handle);
-	fastboot_okay(fb_handle, NULL);
+	fastboot_okay(handle, NULL);
 	return;
 exit_io:
 	io_close(image_handle);
 exit:
-	fastboot_fail(fb_handle, "invalid parameter");
+	fastboot_fail(handle, "invalid parameter");
 }
 
-static void cmd_getvar(struct fastboot_handle *fb_handle, char *arg)
+static void cmd_getvar(fastboot_handle_t *handle, char *arg)
 {
 	int i, num_vars, len, count;
 	int left;
@@ -388,9 +389,9 @@ static void cmd_getvar(struct fastboot_handle *fb_handle, char *arg)
 		}
 		if (count > 0) {
 			sprintf(response + count, "\n");
-			fastboot_okay(fb_handle, response);
+			fastboot_okay(handle, response);
 		} else {
-			fastboot_okay(fb_handle, NULL);
+			fastboot_okay(handle, NULL);
 		}
 		return;
 	} else {
@@ -403,12 +404,12 @@ static void cmd_getvar(struct fastboot_handle *fb_handle, char *arg)
 						      response);
 				if ((len < 0) || (left <= len)) {
 					response[len] = '\0';
-					fastboot_fail(fb_handle, response);
+					fastboot_fail(handle, response);
 				} else {
-					fastboot_okay(fb_handle, response);
+					fastboot_okay(handle, response);
 				}
 			} else {
-				fastboot_okay(fb_handle, vars[i].value);
+				fastboot_okay(handle, vars[i].value);
 			}
 			return;
 		}
@@ -417,22 +418,22 @@ static void cmd_getvar(struct fastboot_handle *fb_handle, char *arg)
 	}
 }
 
-static void cmd_oem(struct fastboot_handle *fb_handle, char *arg)
+static void cmd_oem(fastboot_handle_t *handle, char *arg)
 {
 	int result;
 
 	assert((arg != NULL) && (cmds[CMD_INDEX_OEM].callback != NULL));
 	result = cmds[CMD_INDEX_OEM].callback(arg);
 	if (result == 0) {
-		fastboot_okay(fb_handle, NULL);
+		fastboot_okay(handle, NULL);
 	} else {
-		fastboot_fail(fb_handle, "invalid parameter");
+		fastboot_fail(handle, "invalid parameter");
 	}
 }
 
-static void cmd_reboot(struct fastboot_handle *fb_handle, char *arg)
+static void cmd_reboot(fastboot_handle_t *handle, char *arg)
 {
-	fastboot_okay(fb_handle, NULL);
+	fastboot_okay(handle, NULL);
 	assert(cmds[CMD_INDEX_REBOOT].callback != 0);
 	cmds[CMD_INDEX_REBOOT].callback(arg);
 }
@@ -446,7 +447,6 @@ int fastboot_send(void)
 int fastboot_handle_command(void *buf, int length)
 {
 	int i, num_cmds;
-	struct fastboot_handle fb_handle;
 
 	if ((buf == NULL) || (length <= 0)) {
 		WARN("%s, Invalid parameters.\n", __func__);
@@ -534,8 +534,20 @@ static int fastboot_check_io(unsigned int image_id)
 	return result;
 }
 
+void fastboot_init(const fastboot_ops_t *ops_ptr)
+{
+	assert((ops_ptr != NULL) &&
+	       (ops_ptr->read != NULL) &&
+	       (ops_ptr->write != NULL));
+	/* initialize fasboot handle */
+	fb_handle.state = STATE_OFFLINE;
+	fb_handle.read = ops_ptr->read;
+	fb_handle.write = ops_ptr->write;
+}
+
 int fastboot_run(fastboot_params_t *params)
 {
+	size_t bytes_read;
 	int result;
 
 	assert((params != 0) &&
@@ -551,13 +563,17 @@ int fastboot_run(fastboot_params_t *params)
 	if (result) {
 		return result;
 	}
+	fb_handle.state = STATE_COMMAND;
 
-	fb_running = 1;
-	while (1) {
+	while ((fb_handle.state != STATE_OFFLINE) &&
+	       (fb_handle.state != STATE_ERROR)) {
+#if 0
+		handle->read(&bytes_read);
+#else
 		fastboot_device_handle_interrupts();
-		if (fb_running == 0)
-			break;
+#endif
 	}
+	(void)bytes_read;
 	return 0;
 }
 
