@@ -1140,54 +1140,6 @@ void dw_udc_wait_rx(void)
 	mmio_write_32(GINTSTS, GINTSTS_OEPINT);
 }
 
-void dw_udc_wait_tx(void)
-{
-	uint32_t ints, epints, daint;
-	int tx_completed = 0;
-
-	ints = mmio_read_32(GINTSTS);		/* interrupt status */
-
-	while (tx_completed == 0) {
-		ints = mmio_read_32(GINTSTS);
-		INFO("#%s, ints:0x%x\n", __func__, ints);
-		if ((ints & GINTSTS_IEPINT) == 0)
-			continue;
-
-		epints = mmio_read_32(DIEPINT0);
-		mmio_write_32(DIEPINT0, epints);
-		daint = mmio_read_32(DAINT);
-		INFO("#%s, epints:0x%x daint:0x%x\n", __func__, epints, daint);
-
-		if ((epints & DXEPINT_XFERCOMPL) && (daint & DAINT_INEP(1))) {
-			INFO("IN EP event,ints:0x%x, DIEPINT0:%x, DAINT:%x, DAINTMSK:%x.\n",
-			ints, epints, mmio_read_32(DAINT), mmio_read_32(DAINTMSK));
-			INFO("TX completed.DIEPTSIZ(0) = 0x%x.\n", mmio_read_32(DIEPTSIZ0));
-			/*FIXME,Maybe you can use bytes*/
-			/*int bytes = endpoints[0].size - (DIEPTSIZ(0) & 0x3FFFF);*/ //actual transfer
-			if (endpoints[0].busy) {
-				endpoints[0].busy = 0;//false
-				endpoints[0].rc = 0;
-				endpoints[0].done = 1;//true
-			}
-			tx_completed = 1;
-		}
-		if (epints & 0x4) { /* AHB error */
-			WARN("AHB error on IN EP0.\n");
-			tx_completed = 1;
-		}
-
-		if (epints & 0x8) { /* Timeout */
-			WARN("Timeout on IN EP0.\n");
-			if (endpoints[0].busy) {
-				endpoints[0].busy = 1;//false
-				endpoints[0].rc = 1;
-				endpoints[0].done = 1;//true
-			}
-			tx_completed = 1;
-		}
-	}
-}
-
 void dw_udc_epx_tx(int ep, void *buf, int len)
 {
 	/*
