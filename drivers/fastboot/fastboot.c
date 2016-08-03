@@ -191,26 +191,18 @@ static void fastboot_ack(fastboot_handle_t *handle, const char *code,
 			 const char *reason)
 {
 	char response[FASTBOOT_RESPONSE_LENGTH];
-	int len;
 
-	if (handle->state != STATE_COMMAND) {
+	if (handle->state == STATE_COMMAND) {
+		if (reason == NULL)
+			reason = "";
+		snprintf(response, FASTBOOT_RESPONSE_LENGTH, "%s%s",
+			 code, reason);
+		handle->state = STATE_COMPLETE;
+		handle->write(response, strlen(response));
+		rx_cmd();
+	} else {
 		assert(0);
-		return;
 	}
-
-	if (reason == NULL)
-		reason = "";
-	len = snprintf(response, FASTBOOT_RESPONSE_LENGTH, "%s%s",
-		       code, reason);
-	response[len] = '\0';
-#if 0
-	handle->state = STATE_COMPLETE;
-	handle->handle_write(handle, response, strlen(response));
-#else
-	handle->state = STATE_COMPLETE;
-	handle->write(response, strlen(response));
-	rx_cmd();
-#endif
 }
 
 static void fastboot_okay(fastboot_handle_t *handle, const char *info)

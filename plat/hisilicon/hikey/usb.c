@@ -977,45 +977,6 @@ static void usb_poll(void)
 		mmio_write_32(DOEPCTL1, data | maxpacket);
 	}
 
-	/*
-	 * IN EP event
-	 * The core sets this bit to indicate that an interrupt is pending on one of the IN
-	 * endpoints of the core (in Device mode). The application must read the
-	 * Device All Endpoints Interrupt (DAINT) register to determine the exact
-	 * number of the IN endpoint on which the interrupt occurred, and then read
-	 * the corresponding Device IN Endpoint-n Interrupt (DIEPINTn) register to
-	 * determine the exact cause of the interrupt. The application must clear the
-	 * appropriate status bit in the corresponding DIEPINTn register to clear this bit.
-	 */
-	if (ints & GINTSTS_IEPINT) {
-		epints = mmio_read_32(DIEPINT0);
-		mmio_write_32(DIEPINT0, epints);
-
-		//VERBOSE("IN EP event,ints:0x%x, DIEPINT0:%x, DAINT:%x, DAINTMSK:%x.\n",
-		//	ints, epints, mmio_read_32(DAINT), mmio_read_32(DAINTMSK));
-		if (epints & 0x1) { /* Transfer Completed Interrupt (XferCompl) */
-			VERBOSE("TX completed.DIEPTSIZ(0) = 0x%x.\n", mmio_read_32(DIEPTSIZ0));
-			/*FIXME,Maybe you can use bytes*/
-			/*int bytes = endpoints[0].size - (DIEPTSIZ(0) & 0x3FFFF);*/ //actual transfer
-			if (endpoints[0].busy) {
-				endpoints[0].busy = 0;//false
-				endpoints[0].rc = 0;
-				endpoints[0].done = 1;//true
-			}
-		}
-		if (epints & 0x4) { /* AHB error */
-			WARN("AHB error on IN EP0.\n");
-		}
-
-		if (epints & 0x8) { /* Timeout */
-			WARN("Timeout on IN EP0.\n");
-			if (endpoints[0].busy) {
-				endpoints[0].busy = 1;//false
-				endpoints[0].rc = 1;
-				endpoints[0].done = 1;//true
-			}
-		}
-	}
 
 #if 1
 	/*
@@ -1284,6 +1245,105 @@ void fastboot_device_handle_interrupts(void)
 	usb_poll();
 }
 
+void dw_udc_wait_rx(void)
+{
+	uint32_t ints, epints;
+	int rx_completed = 0;
+
+	ints = mmio_read_32(GINTSTS);		/* interrupt status */
+
+	while (rx_completed == 0) {
+		if ((ints & GINTSTS_OEPINT) == 0)
+			continue;
+
+		epints = mmio_read_32(DOEPINT1);
+		if (epints == 0)
+			continue;
+		mmio_write_32(DOEPINT1, epints);
+
+		//INFO("OUT EP1: epints :0x%x,DOEPTSIZ1 :0x%x.\n",epints, mmio_read_32(DOEPTSIZ1));
+		/* Transfer Completed Interrupt (XferCompl);Transfer completed */
+		if (epints & DXEPINT_XFERCOMPL) {
+			/* ((readl(DOEPTSIZ(1))) & 0x7FFFF is Transfer Size (XferSize) */
+			/*int bytes = (p_endpoints + 1)->size - ((readl(DOEPTSIZ(1))) & 0x7FFFF);*/
+			int bytes = rx_desc_bytes - dma_desc.status.b.bytes;
+			//INFO("OUT EP1: recv %d bytes , buf:0x%lx\n",bytes, (uintptr_t)rx_req.buf);
+			if (endpoints[1].busy) {
+				endpoints[1].busy = 0;
+				endpoints[1].rc = 0;
+				endpoints[1].done = 1;
+				if (rx_req.complete == usb_rx_cmd_complete) {
+					//NOTICE("recv command\n");
+					fastboot_handle_command(rx_req.buf, bytes);
+				} else if (rx_req.complete == usb_rx_data_complete) {
+					//NOTICE("recv data\n");
+					rx_req.complete(bytes, 0);
+					//fastboot_receive_data(rx_req.buf, bytes);
+				} else {
+					ERROR("#%s, %d, error\n", __func__, __LINE__);
+				}
+			}
+		}
+
+		if (epints & DXEPINT_AHBERR) { /* AHB error */
+			WARN("AHB error on OUT EP1.\n");
+		}
+		if (epints & DXEPINT_SETUP) { /* SETUP phase done */
+			WARN("SETUP phase done  on OUT EP1.\n");
+		}
+	}
+
+	/* write to clear interrupts */
+	mmio_write_32(GINTSTS, GINTSTS_OEPINT);
+}
+
+void dw_udc_wait_tx(void)
+{
+	uint32_t ints, epints, daint;
+	int tx_completed = 0;
+
+	ints = mmio_read_32(GINTSTS);		/* interrupt status */
+
+	while (tx_completed == 0) {
+		ints = mmio_read_32(GINTSTS);
+		INFO("#%s, ints:0x%x\n", __func__, ints);
+		if ((ints & GINTSTS_IEPINT) == 0)
+			continue;
+
+		epints = mmio_read_32(DIEPINT0);
+		mmio_write_32(DIEPINT0, epints);
+		daint = mmio_read_32(DAINT);
+		INFO("#%s, epints:0x%x daint:0x%x\n", __func__, epints, daint);
+
+		if ((epints & DIEPINT_XFERCOMPL) && (daint & DAINT_INEP(1))) {
+			INFO("IN EP event,ints:0x%x, DIEPINT0:%x, DAINT:%x, DAINTMSK:%x.\n",
+			ints, epints, mmio_read_32(DAINT), mmio_read_32(DAINTMSK));
+			INFO("TX completed.DIEPTSIZ(0) = 0x%x.\n", mmio_read_32(DIEPTSIZ0));
+			/*FIXME,Maybe you can use bytes*/
+			/*int bytes = endpoints[0].size - (DIEPTSIZ(0) & 0x3FFFF);*/ //actual transfer
+			if (endpoints[0].busy) {
+				endpoints[0].busy = 0;//false
+				endpoints[0].rc = 0;
+				endpoints[0].done = 1;//true
+			}
+			tx_completed = 1;
+		}
+		if (epints & 0x4) { /* AHB error */
+			WARN("AHB error on IN EP0.\n");
+			tx_completed = 1;
+		}
+
+		if (epints & 0x8) { /* Timeout */
+			WARN("Timeout on IN EP0.\n");
+			if (endpoints[0].busy) {
+				endpoints[0].busy = 1;//false
+				endpoints[0].rc = 1;
+				endpoints[0].done = 1;//true
+			}
+			tx_completed = 1;
+		}
+	}
+}
 
 int dw_udc_read(size_t *size)
 {
@@ -1292,7 +1352,13 @@ int dw_udc_read(size_t *size)
 
 int dw_udc_write(char *buf, size_t size)
 {
-	tx_status(buf);
+	assert(tx_req.buf != 0);
+
+	memcpy(tx_req.buf, buf, size + 1);
+	tx_req.length = size;
+	tx_req.complete = 0;
+	hiusb_epx_tx(ep1in.num, tx_req.buf, tx_req.length);
+	//dw_udc_wait_tx();
 	return 0;
 }
 

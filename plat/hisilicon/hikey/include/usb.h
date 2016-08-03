@@ -424,6 +424,8 @@ struct usb_request {
 #define DIEPTSIZ15  		(DWC_OTG_BASE + 0xAF0)
 #define DIEPDMA15   		(DWC_OTG_BASE + 0xAF4)
 
+#define DIEPINT_XFERCOMPL		(1 << 0)
+
 /* Device Logical OUT Endpoint-Specific Registers */
 #define DOEPCTL(x)  		(DWC_OTG_BASE + 0xB00 + 0x20 * (x))
 #define DXEPCTL_EPENA			(1 << 31)
