@@ -127,6 +127,8 @@ static const struct usb_string_descriptor lang_descriptor = {
 static void usb_rx_cmd_complete(unsigned actual, int stat);
 static void usb_rx_data_complete(unsigned actual, int status);
 
+void dw_udc_epx_rx(int ep, void *buf, int len);
+
 static unsigned int rx_desc_bytes = 0;
 unsigned long rx_addr;
 unsigned long rx_length;
@@ -414,94 +416,13 @@ void usb_drv_cancel_all_transfers(void)
 	reset_endpoints();
 }
 
-int hiusb_epx_rx(unsigned ep, void *buf, unsigned len)
-{
-	unsigned int blocksize = 0, data;
-	int packets;
-
-	VERBOSE("ep%d rx, len = 0x%x, buf = 0x%x.\n", ep, len, buf);
-
-	endpoints[ep].busy = 1;//true
-	/* EPx UNSTALL */
-	data = mmio_read_32(DOEPCTL(ep)) & ~0x00200000;
-	mmio_write_32(DOEPCTL(ep), data);
-	/* EPx OUT ACTIVE */
-	data = mmio_read_32(DOEPCTL(ep)) | 0x8000;
-	mmio_write_32(DOEPCTL(ep), data);
-
-	blocksize = usb_drv_port_speed() ? USB_BLOCK_HIGH_SPEED_SIZE : 64;
-	packets = (len + blocksize - 1) / blocksize;
-
-#define MAX_RX_PACKET 0x3FF
-
-	/*Max recv packets is 1023*/
-	if (packets > MAX_RX_PACKET) {
-		endpoints[ep].size = MAX_RX_PACKET * blocksize;
-		len = MAX_RX_PACKET * blocksize;
-	} else {
-		endpoints[ep].size = len;
-	}
-
-	if (!len) {
-		/* one empty packet */
-		mmio_write_32(DOEPTSIZ(ep), 1 << 19);
-		//NULL  /* dummy address */
-		dma_desc.status.b.bs = 0x3;
-		dma_desc.status.b.mtrf = 0;
-		dma_desc.status.b.sr = 0;
-		dma_desc.status.b.l = 1;
-		dma_desc.status.b.ioc = 1;
-		dma_desc.status.b.sp = 0;
-		dma_desc.status.b.bytes = 0;
-		dma_desc.buf = 0;
-		dma_desc.status.b.sts = 0;
-		dma_desc.status.b.bs = 0x0;
-
-		mmio_write_32(DOEPDMA(ep), (unsigned long)&dma_desc);
-	} else {
-		if (len >= blocksize * 64) {
-			rx_desc_bytes = blocksize*64;
-		} else {
-			rx_desc_bytes = len;
-		}
-		VERBOSE("rx len %d, rx_desc_bytes %d \n",len,rx_desc_bytes);
-		dma_desc.status.b.bs = 0x3;
-		dma_desc.status.b.mtrf = 0;
-		dma_desc.status.b.sr = 0;
-		dma_desc.status.b.l = 1;
-		dma_desc.status.b.ioc = 1;
-		dma_desc.status.b.sp = 0;
-		dma_desc.status.b.bytes = rx_desc_bytes;
-		dma_desc.buf = (unsigned long)buf;
-		dma_desc.status.b.sts = 0;
-		dma_desc.status.b.bs = 0x0;
-
-		mmio_write_32(DOEPDMA(ep), (unsigned long)&dma_desc);
-	}
-	/* EPx OUT ENABLE CLEARNAK */
-	data = mmio_read_32(DOEPCTL(ep));
-	data |= 0x84000000;
-	mmio_write_32(DOEPCTL(ep), data);
-	return 0;
-}
-
-int usb_queue_req(struct usb_endpoint *ept, struct usb_request *req)
-{
-	if (ept->in)
-		assert(0);
-	else
-		hiusb_epx_rx(ept->num, req->buf, req->length);
-
-	return 0;
-}
-
 void rx_cmd(void)
 {
 	struct usb_request *req = &rx_req;
 	req->buf = cmdbuf;
 	req->length = RX_REQ_LEN;
 	req->complete = usb_rx_cmd_complete;
-	usb_queue_req(&ep1out, req);
+	dw_udc_epx_rx(ep1out.num, req->buf, req->length);
 }
 
 void rx_data(void)
@@ -511,7 +432,7 @@ void rx_data(void)
 	req->buf = (void *)((unsigned long) rx_addr);
 	req->length = rx_length;
 	req->complete = usb_rx_data_complete;
-	usb_queue_req(&ep1out, req);
+	dw_udc_epx_rx(ep1out.num, req->buf, req->length);
 	rx_data_complete = 0;
 }
 
@@ -1138,6 +1059,62 @@ void dw_udc_wait_rx(void)
 
 	/* write to clear interrupts */
 	mmio_write_32(GINTSTS, GINTSTS_OEPINT);
+}
+
+void dw_udc_epx_rx(int ep, void *buf, int len)
+{
+	int rx_size, packets;
+	unsigned int data;
+
+	endpoints[ep].busy = 1;
+	/* unset EPx STALL */
+	data = mmio_read_32(DOEPCTL(ep)) & ~DOEPCTL_STALL;
+	mmio_write_32(DOEPCTL(ep), data);
+	/* active EPx OUT */
+	data = mmio_read_32(DOEPCTL(ep)) | DOEPCTL_USBACTEP;
+	mmio_write_32(DOEPCTL(ep), data);
+
+	if (usb_drv_port_speed()) {
+		rx_size = USB_BLOCK_HIGH_SPEED_SIZE;
+	} else {
+		rx_size = 64;
+	}
+	packets = (len + rx_size - 1) / rx_size;
+	if (packets > DW_UDC_RX_MAX_PACKETS) {
+		endpoints[ep].size = DW_UDC_RX_MAX_PACKETS * rx_size;
+		len = endpoints[ep].size;
+	} else {
+		endpoints[ep].size = len;
+	}
+
+	if (len == 0) {
+		/* one empty packet */
+		mmio_write_32(DOEPTSIZ(ep), DXEPTSIZ_PKTCNT(1));
+		dma_desc.status.b.bytes = 0;
+		dma_desc.buf = 0;
+	} else {
+		/* FIXME: what's this? */
+		if (len >= rx_size * 64) {
+			rx_desc_bytes = rx_size * 64;
+		} else {
+			rx_desc_bytes = len;
+		}
+		dma_desc.status.b.bytes = rx_desc_bytes;
+		dma_desc.buf = (unsigned long)buf;
+	}
+	dma_desc.status.b.bs = 0x3;
+	dma_desc.status.b.mtrf = 0;
+	dma_desc.status.b.sr = 0;
+	dma_desc.status.b.l = 1;
+	dma_desc.status.b.ioc = 1;
+	dma_desc.status.b.sp = 0;
+	dma_desc.status.b.sts = 0;
+	dma_desc.status.b.bs = 0x0;
+	mmio_write_32(DOEPDMA(ep), (unsigned long)&dma_desc);
+
+	data = mmio_read_32(DOEPCTL(ep));
+	data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
+	mmio_write_32(DOEPCTL(ep), data);
 }
 
 void dw_udc_epx_tx(int ep, void *buf, int len)

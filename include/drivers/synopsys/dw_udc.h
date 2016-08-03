@@ -31,6 +31,8 @@
 #ifndef __DW_UDC_H__
 #define __DW_UDC_H__
 
+#define DW_UDC_RX_MAX_PACKETS			0x3ff
+
 void dw_udc_init(void);
 
 #endif	/* __DW_UDC_H__ */

@@ -444,6 +444,8 @@ struct usb_request {
 #define DXEPCTL_NEXTEP_SHIFT		11
 #define DXEPCTL_NEXTEP_LIMIT		0xf
 #define DXEPCTL_NEXTEP(_x)		((_x) << 11)
+#define DOEPCTL_STALL			(1 << 21)
+#define DOEPCTL_USBACTEP		(1 << 15)
 
 
 #define DOEPINT(x)  		(DWC_OTG_BASE + 0xB08 + 0x20 * (x))
