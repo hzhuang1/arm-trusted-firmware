@@ -53,6 +53,24 @@
 
 #define DW_UDC_TIMEOUT			10000
 
+#define DEBUG_DW_UDC_DMA
+
+/* software is handling DMA descriptor */
+#define DMAC_DES0_BS_HOST_BUSY			(3 << 30)
+#define DMAC_DES0_BS_DMA_DONE			(2 << 30)
+#define DMAC_DES0_BS_DMA_BUSY			(1 << 30)
+#define DMAC_DES0_BS_HOST_READY			(0 << 30)
+/* last descriptor in DMA chain */
+#define DMAC_DES0_LAST				(1 << 27)
+/* inidicates short packet */
+#define DMAC_DES0_SP				(1 << 26)
+/* indicates controller to report XferCompl interrupt after done */
+#define DMAC_DES0_IOC				(1 << 25)
+/* indicates to receive setup packet */
+#define DMAC_DES0_SR				(1 << 24)
+/* tx or rx bytes */
+#define DMAC_DES0_BYTES(x)			(x & 0xffff)
+
 struct ep_type {
 	unsigned char		active;
 	unsigned char		busy;
@@ -76,7 +94,8 @@ struct usb_config_bundle {
 	struct usb_endpoint_descriptor ep2;
 } __attribute__ ((packed));
 
-static setup_packet ctrl_req[NUM_ENDPOINTS]
+//static setup_packet ctrl_req[NUM_ENDPOINTS]
+static setup_packet ctrl_req
 __attribute__ ((section("tzfw_coherent_mem")));
 static unsigned char ctrl_resp[2]
 __attribute__ ((section("tzfw_coherent_mem")));
@@ -92,6 +111,13 @@ dwc_otg_dev_dma_desc_t dma_desc_in
 __attribute__ ((section("tzfw_coherent_mem")));
 dwc_otg_dev_dma_desc_t dma_desc_addr
 __attribute__ ((section("tzfw_coherent_mem")));
+
+#ifdef DEBUG_DW_UDC_DMA
+void dwc2_start_dma(uintptr_t buf, int in, int ep, size_t size);
+
+dwc_otg_dev_dma_desc_t dwc2_dma_desc
+__attribute__ ((section("tzfw_coherent_mem")));
+#endif
 
 static struct usb_config_bundle config_bundle
 __attribute__ ((section("tzfw_coherent_mem")));
@@ -132,7 +158,10 @@ void dw_udc_epx_rx(int ep, void *buf, int len);
 static unsigned int rx_desc_bytes = 0;
 unsigned long rx_addr;
 unsigned long rx_length;
+//#ifndef DEBUG_DW_UDC_DMA
+#if 1
 static unsigned int last_one = 0;
+#endif
 int rx_data_complete = 0;
 #if 0
 static char *cmdbuf;
@@ -192,7 +221,11 @@ static void reset_endpoints(void)
 		(64 << DOEPTSIZ0_XFERSIZE_SHIFT);
 	mmio_write_32(DOEPTSIZ0, data);
 	//notes that:the compulsive conversion is expectable.
-	dma_desc_ep0.status.b.bs = 0x3;
+	//dma_desc_ep0.status.b.bs = 0x3;
+#ifdef DEBUG_DW_UDC_DMA
+	// EP0 OUT
+	dwc2_start_dma((uintptr_t)&ctrl_req, 0, 0, 64);
+#else
 	dma_desc_ep0.status.b.mtrf = 0;
 	dma_desc_ep0.status.b.sr = 0;
 	dma_desc_ep0.status.b.l = 1;
@@ -209,9 +242,56 @@ static void reset_endpoints(void)
 	/* EP0 OUT ENABLE CLEARNAK */
 	data = mmio_read_32(DOEPCTL0);
 	mmio_write_32(DOEPCTL0, (data | 0x84000000));
+#endif
 
 	VERBOSE("exit reset_endpoints. \n");
 }
+
+#ifdef DEBUG_DW_UDC_DMA
+void dwc2_start_dma(uintptr_t buf, int in, int ep, size_t size)
+{
+	uint32_t data;
+	int timeout = DW_UDC_TIMEOUT;
+
+	data = DMAC_DES0_LAST | DMAC_DES0_IOC |	DMAC_DES0_BYTES((uint32_t)size);
+	memcpy(&dwc2_dma_desc.status, &data, sizeof(uint32_t));
+	dwc2_dma_desc.buf = (uint32_t)buf;
+
+	if (in) {
+		mmio_write_32(DIEPDMA(ep), (uint32_t)((uintptr_t)&dwc2_dma_desc));
+		data = mmio_read_32(DIEPCTL(ep));
+		data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
+		mmio_write_32(DIEPCTL(ep), data);
+		/* polling for INT */
+		do {
+			data = mmio_read_32(DIEPINT(ep));
+			if (--timeout == 0) {
+				NOTICE("IN Timeout\n");
+				break;
+			}
+			udelay(10);
+		} while (data == 0);
+		//NOTICE("#%s, %d, DIEPINT(%d):0x%x\n", __func__, __LINE__, ep, data);
+		//} while ((data & DXEPINT_XFERCOMPL) == 0);
+	} else {
+		mmio_write_32(DOEPDMA(ep), (uint32_t)((uintptr_t)&dwc2_dma_desc));
+		data = mmio_read_32(DOEPCTL(ep));
+		data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
+		mmio_write_32(DOEPCTL(ep), data);
+		/* polling for INT */
+		do {
+			data = mmio_read_32(DOEPINT(ep));
+			if (--timeout == 0) {
+				NOTICE("OUT Timeout");
+				break;
+			}
+			udelay(10);
+		} while (data == 0);
+		//NOTICE("#%s, %d, DOEPINT(%d):0x%x\n", __func__, __LINE__, ep, data);
+		//} while ((data & DXEPINT_XFERCOMPL) == 0);
+	}
+}
+#endif
 
 static int usb_drv_request_endpoint(int type, int dir)
 {
@@ -360,6 +440,14 @@ static void ep_send(int ep, const void *ptr, int len)
 	data = mmio_read_32(DIEPCTL(ep)) | DXEPCTL_USBACTEP;
 	mmio_write_32(DIEPCTL(ep), data);
 
+#ifdef DEBUG_DW_UDC_DMA
+	// EPx IN
+	if (!len) {
+		dwc2_start_dma(0, 1, ep, len);
+	} else {
+		dwc2_start_dma((uintptr_t)ptr, 1, ep, len);
+	}
+#else
 	/* set DMA Address */
 	if (!len) {
 		/* send one empty packet */
@@ -367,18 +455,21 @@ static void ep_send(int ep, const void *ptr, int len)
 	} else {
 		dma_desc_in.buf = (unsigned long)ptr;
 	}
-	dma_desc_in.status.b.bs = 0x3;
+	//dma_desc_in.status.b.bs = 0x3;
 	dma_desc_in.status.b.l = 1;
 	dma_desc_in.status.b.ioc = 1;
-	dma_desc_in.status.b.sp = 1;
+	//dma_desc_in.status.b.sp = 1;
+	dma_desc_in.status.b.sp = 0;
 	dma_desc_in.status.b.sts = 0;
 	dma_desc_in.status.b.bs = 0x0;
 	dma_desc_in.status.b.bytes = len;
 	mmio_write_32(DIEPDMA(ep), (unsigned long)&dma_desc_in);
 
 	data = mmio_read_32(DIEPCTL(ep));
-	data |= DXEPCTL_EPENA | DXEPCTL_CNAK | DXEPCTL_NEXTEP(ep + 1);
+	data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
+	//data |= DXEPCTL_EPENA | DXEPCTL_CNAK | DXEPCTL_NEXTEP(ep + 1);
 	mmio_write_32(DIEPCTL(ep), data);
+#endif
 }
 
 void usb_drv_stall(int endpoint, char stall, char in)
@@ -806,7 +897,14 @@ static void usb_poll(void)
 			 */
 			// notes that:the compulsive conversion is expectable.
 			// Holds the start address of the external memory for storing or fetching endpoint data.
-			dma_desc_ep0.status.b.bs = 0x3;
+			//dma_desc_ep0.status.b.bs = 0x3;
+#ifdef DEBUG_DW_UDC_DMA
+			//memset(&ctrl_req, 0, sizeof(setup_packet));
+			// EP0 OUT
+			//NOTICE("#%s, %d\n", __func__, __LINE__);
+			dwc2_start_dma((uintptr_t)&ctrl_req, 0, 0, 64);
+			//NOTICE("#%s, %d\n", __func__, __LINE__);
+#else
 			dma_desc_ep0.status.b.mtrf = 0;
 			dma_desc_ep0.status.b.sr = 0;
 			dma_desc_ep0.status.b.l = 1;
@@ -819,6 +917,7 @@ static void usb_poll(void)
 			mmio_write_32(DOEPDMA0, (uintptr_t)&dma_desc_ep0);
 			// endpoint enable; clear NAK
 			mmio_write_32(DOEPCTL0, 0x84000000);
+#endif
 		}
 
 		epints = mmio_read_32(DOEPINT1);
@@ -1102,7 +1201,7 @@ void dw_udc_epx_rx(int ep, void *buf, int len)
 		dma_desc.status.b.bytes = rx_desc_bytes;
 		dma_desc.buf = (unsigned long)buf;
 	}
-	dma_desc.status.b.bs = 0x3;
+	//dma_desc.status.b.bs = 0x3;
 	dma_desc.status.b.mtrf = 0;
 	dma_desc.status.b.sr = 0;
 	dma_desc.status.b.l = 1;
@@ -1151,6 +1250,35 @@ void dw_udc_epx_tx(int ep, void *buf, int len)
 	}
 	packets = (len + tx_size - 1) / tx_size;
 
+//#ifdef DEBUG_DW_UDC_DMA
+#if 0
+	/* wait for NAK interrupt */
+	timeout = DW_UDC_TIMEOUT;
+	while (timeout--) {
+		data = mmio_read_32(DIEPINT(ep));
+		if (data & DXEPINT_NAKINTRPT)
+			break;
+		udelay(10);
+	}
+	if (timeout == 0) {
+		WARN("DIEPCTL(%d):0x%x, DTXFSTS(%d):0x%x, "
+		     "DIEPINT(%d):0x%x, DIEPTSIZ(%d):0x%x, "
+		     "GINTSTS:0x%x\n",
+		     ep, mmio_read_32(DIEPCTL(ep)),
+		     ep, mmio_read_32(DTXFSTS(ep)),
+		     ep, mmio_read_32(DIEPINT(ep)),
+		     ep, mmio_read_32(DIEPTSIZ(ep)),
+		     mmio_read_32(GINTSTS));
+	}
+	// EPx IN
+	if (len == 0) {
+		mmio_write_32(DIEPTSIZ(ep), DXEPTSIZ_PKTCNT(1));
+		dwc2_start_dma(0, 1, ep, len);
+	} else {
+		mmio_write_32(DIEPTSIZ(ep), len | DXEPTSIZ_PKTCNT(packets));
+		dwc2_start_dma((uintptr_t)buf, 1, ep, len);
+	}
+#else
 	if (len == 0) {
 		/* one empty packet */
 		mmio_write_32(DIEPTSIZ(ep), DXEPTSIZ_PKTCNT(1));
@@ -1159,7 +1287,7 @@ void dw_udc_epx_tx(int ep, void *buf, int len)
 		mmio_write_32(DIEPTSIZ(ep), len | DXEPTSIZ_PKTCNT(packets));
 		dma_desc_in.buf = (unsigned long)buf;
 	}
-	dma_desc_in.status.b.bs = 0x3;
+	//dma_desc_in.status.b.bs = 0x3;
 	dma_desc_in.status.b.l = 1;
 	dma_desc_in.status.b.ioc = 1;
 	dma_desc_in.status.b.sp = last_one;
@@ -1194,6 +1322,7 @@ void dw_udc_epx_tx(int ep, void *buf, int len)
 	mmio_write_32(DIEPCTL(ep), data);
 	dsb();
 	isb();
+#endif
 
 	/* wait for EP transmission completed */
 	timeout = DW_UDC_TIMEOUT;
