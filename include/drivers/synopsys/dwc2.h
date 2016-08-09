@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2014, Linaro Ltd and Contributors. All rights reserved.
- * Copyright (c) 2014, Hisilicon Ltd and Contributors. All rights reserved.
+ * Copyright (c) 2016, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -29,77 +28,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __DWC_USB_H__
-#define __DWC_USB_H__
+#ifndef __DWC2_H__
+#define __DWC2_H__
 
-typedef enum usb_interrupt_type {
-	USB_INT_OUT_SETUP,
-	USB_INT_OUT_DATA,
-	USB_INT_IN,
-	USB_INT_ENUM_DONE,
-	USB_INT_RESET,
-	USB_INT_INVALID
-} usb_interrupt_type_t;
-
-typedef struct usb_interrupt {
-	usb_interrupt_type_t	type;
-	int			ep_idx;
-} usb_interrupt_t;
-
-typedef struct {
-	unsigned char		type;
-	unsigned char		request;
-	unsigned short		value;
-	unsigned short		index;
-	unsigned short		length;
-} setup_packet;
-
-/*
- * Standard requests, for the bRequest field of a SETUP packet.
- *
- * These are qualified by the bRequestType field, so that for example
- * TYPE_CLASS or TYPE_VENDOR specific feature flags could be retrieved
- * by a GET_STATUS request.
- */
-#define USB_REQ_GET_STATUS              0x00
-#define USB_REQ_CLEAR_FEATURE           0x01
-#define USB_REQ_SET_FEATURE             0x03
-#define USB_REQ_SET_ADDRESS             0x05
-#define USB_REQ_GET_DESCRIPTOR          0x06
-#define USB_REQ_SET_DESCRIPTOR          0x07
-#define USB_REQ_GET_CONFIGURATION       0x08
-#define USB_REQ_SET_CONFIGURATION       0x09
-#define USB_REQ_GET_INTERFACE           0x0A
-#define USB_REQ_SET_INTERFACE           0x0B
-#define USB_REQ_SYNCH_FRAME             0x0C
-
-/* USB_DT_DEVICE: Device descriptor */
-struct usb_device_descriptor {
-        unsigned char  bLength;
-        unsigned char  bDescriptorType;
-
-        unsigned short bcdUSB;
-        unsigned char  bDeviceClass;
-        unsigned char  bDeviceSubClass;
-        unsigned char  bDeviceProtocol;
-        unsigned char  bMaxPacketSize0;
-        unsigned short idVendor;
-        unsigned short idProduct;
-        unsigned short bcdDevice;
-        unsigned char  iManufacturer;
-        unsigned char  iProduct;
-        unsigned char  iSerialNumber;
-        unsigned char  bNumConfigurations;
-} __attribute__ ((packed));
+#include <fastboot.h>
 
 #define USB_DT_DEVICE_SIZE              18
-
-typedef struct usb_ops {
-	int	(*get_descriptor)(setup_packet *setup, struct usb_device_descriptor *descriptor);
-	int	(*poll)(usb_interrupt_t *usb_intr, size_t *size);
-	int	(*set_addr)(int addr);
-	int	(*submit_packet)(uintptr_t buf, size_t size);
-} usb_ops_t;
 
 #define USB_DMA
 
@@ -904,5 +838,8 @@ typedef struct dwc_otg_dev_dma_desc {
 } dwc_otg_dev_dma_desc_t;
 
 extern void usb_reinit(void);
+#define DW_UDC_RX_MAX_PACKETS			0x3ff
 
-#endif	/* __DWC_USB_H__*/
+void dw_udc_init(fastboot_params_t *params);
+
+#endif	/* __DWC2_H__ */

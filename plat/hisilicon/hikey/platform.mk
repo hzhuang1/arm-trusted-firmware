@@ -79,11 +79,12 @@ BL2U_SOURCES		+=	drivers/arm/pl061/pl061_gpio.c		\
 				drivers/io/io_storage.c			\
 				drivers/partition/partition.c		\
 				drivers/synopsys/emmc/dw_mmc.c		\
+				drivers/synopsys/usb/dwc2.c		\
+				drivers/usb/usb.c			\
 				plat/common/aarch64/platform_up_stack.S	\
 				plat/hisilicon/hikey/hikey_bl2u_setup.c	\
 				plat/hisilicon/hikey/hikey_io_storage.c	\
-				plat/hisilicon/hikey/hikey_fastboot.c	\
-				plat/hisilicon/hikey/usb.c
+				plat/hisilicon/hikey/hikey_fastboot.c
 
 BL2_SOURCES		+=	drivers/arm/sp804/sp804_delay_timer.c	\
 				drivers/delay_timer/delay_timer.c	\

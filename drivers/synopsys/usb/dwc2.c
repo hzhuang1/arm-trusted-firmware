@@ -33,7 +33,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <debug.h>
-#include <dw_udc.h>
+#include <dwc2.h>
 #include <fastboot.h>
 #include <gpio.h>
 #include <hi6220.h>
@@ -43,7 +43,7 @@
 #include <sp804_delay_timer.h>
 #include <string.h>
 #include <usb.h>
-#include "hikey_private.h"
+//#include "hikey_private.h"
 
 #define NUM_ENDPOINTS			16
 
@@ -94,8 +94,6 @@ struct usb_config_bundle {
 	struct usb_endpoint_descriptor ep2;
 } __attribute__ ((packed));
 
-static int usb_enum_done;
-
 //static setup_packet ctrl_req[NUM_ENDPOINTS]
 static setup_packet ctrl_req
 __attribute__ ((section("tzfw_coherent_mem")));
@@ -133,8 +131,6 @@ __attribute__ ((section("tzfw_coherent_mem")));
 
 static struct usb_string_descriptor serial_string
 __attribute__ ((section("tzfw_coherent_mem")));
-
-static usb_ops_t usb_ops;
 
 static const struct usb_string_descriptor string_devicename = {
 	24,
@@ -506,7 +502,7 @@ static void ep_send(int ep, const void *ptr, int len)
 #endif
 }
 
-void usb_drv_stall(int endpoint, char stall, char in)
+void dwc2_set_stall(int endpoint, char stall, char in)
 {
 	unsigned int data;
 
@@ -682,7 +678,7 @@ void usb_handle_control_request(setup_packet* req)
 	case USB_REQ_CLEAR_FEATURE:
 		if ((req->type == USB_RECIP_ENDPOINT) &&
 		    (req->value == USB_ENDPOINT_HALT))
-			usb_drv_stall(req->index & 0xf, 0, req->index >> 7);
+			dwc2_set_stall(req->index & 0xf, 0, req->index >> 7);
 		size = 0;
 		break;
 
@@ -808,190 +804,14 @@ void usb_handle_control_request(setup_packet* req)
 	if (!size) {
 		usb_drv_send_nonblocking(0, 0, 0);  // send an empty packet
 	} else if (size == -1) { // stall:Applies to non-control, non-isochronous IN and OUT endpoints only.
-		usb_drv_stall(0, 1, 1);     // IN
-		usb_drv_stall(0, 1, 0);     // OUT
+		dwc2_set_stall(0, 1, 1);     // IN
+		dwc2_set_stall(0, 1, 0);     // OUT
 	} else { // stall:Applies to control endpoints only.
-		usb_drv_stall(0, 0, 1);     // IN
-		usb_drv_stall(0, 0, 0);     // OUT
+		dwc2_set_stall(0, 0, 1);     // IN
+		dwc2_set_stall(0, 0, 0);     // OUT
 
 		usb_drv_send_nonblocking(0, addr, size > req->length ? req->length : size);
 	}
-}
-
-/* IRQ handler */
-static void usb_poll(void)
-{
-	uint32_t ints;
-	uint32_t epints, data;
-
-	ints = mmio_read_32(GINTSTS);		/* interrupt status */
-
-
-	if ((ints & 0xc3010) == 0)
-		return;
-	/*
-	 * bus reset
-	 * The core sets this bit to indicate that a reset is detected on the USB.
-	 */
-	if (ints & GINTSTS_USBRST) {
-		NOTICE("bus reset intr\n");
-		/*set Non-Zero-Length status out handshake */
-		/*
-		 * DCFG:This register configures the core in Device mode after power-on
-		 * or after certain control commands or enumeration. Do not make changes
-		 * to this register after initial programming.
-		 * Send a STALL handshake on a nonzero-length status OUT transaction and
-		 * do not send the received OUT packet to the application.
-		 */
-#if 0
-		mmio_write_32(DCFG, 0x800004);
-		reset_endpoints();
-#endif
-	}
-	/*
-	 * enumeration done, we now know the speed
-	 * The core sets this bit to indicate that speed enumeration is complete. The
-	 * application must read the Device Status (DSTS) register to obtain the
-	 * enumerated speed.
-	 */
-	if (ints & GINTSTS_ENUMDONE) {
-		/* Set up the maximum packet sizes accordingly */
-		uint32_t maxpacket = usb_drv_port_speed() ? USB_BLOCK_HIGH_SPEED_SIZE : 64;  // high speed maxpacket=512
-		VERBOSE("enum done intr. Maxpacket:%d\n", maxpacket);
-		//Set Maximum In Packet Size (MPS)
-		data = mmio_read_32(DIEPCTL1) & ~0x000003ff;
-		mmio_write_32(DIEPCTL1, data | maxpacket);
-		//Set Maximum Out Packet Size (MPS)
-		data = mmio_read_32(DOEPCTL1) & ~0x000003ff;
-		mmio_write_32(DOEPCTL1, data | maxpacket);
-	}
-
-
-#if 1
-	/*
-	 * OUT EP event
-	 * The core sets this bit to indicate that an interrupt is pending on one of the
-	 * OUT endpoints of the core (in Device mode). The application must read the
-	 * Device All Endpoints Interrupt (DAINT) register to determine the exact
-	 * number of the OUT endpoint on which the interrupt occurred, and then read
-	 * the corresponding Device OUT Endpoint-n Interrupt (DOEPINTn) register
-	 * to determine the exact cause of the interrupt. The application must clear the
-	 * appropriate status bit in the corresponding DOEPINTn register to clear this bit.
-	 */
-	if (ints & GINTSTS_OEPINT) {
-		/* indicates the status of an endpoint
-		 * with respect to USB- and AHB-related events. */
-		epints = mmio_read_32(DOEPINT(0));
-		//VERBOSE("OUT EP event,ints:0x%x, DOEPINT0:%x, DAINT:%x, DAINTMSK:%x.\n",
-		//	ints, epints, mmio_read_32(DAINT), mmio_read_32(DAINTMSK));
-		if (epints) {
-			mmio_write_32(DOEPINT(0), epints);
-			/* Transfer completed */
-			if (epints & DXEPINT_XFERCOMPL) {
-				/*FIXME,need use bytes*/
-				VERBOSE("EP0 RX completed. DOEPTSIZ(0) = 0x%x.\n",
-					mmio_read_32(DOEPTSIZ(0)));
-				if (endpoints[0].busy) {
-					endpoints[0].busy = 0;
-					endpoints[0].rc = 0;
-					endpoints[0].done = 1;
-				}
-			}
-			if (epints & DXEPINT_AHBERR) { /* AHB error */
-				WARN("AHB error on OUT EP0.\n");
-			}
-
-			/*
-			 * IN Token Received When TxFIFO is Empty (INTknTXFEmp)
-			 * Indicates that an IN token was received when the associated TxFIFO (periodic/nonperiodic)
-			 * was empty. This interrupt is asserted on the endpoint for which the IN token
-			 * was received.
-			 */
-			if (epints & DXEPINT_SETUP) { /* SETUP phase done */
-				VERBOSE("Setup phase \n");
-				data = mmio_read_32(DIEPCTL(0)) | DXEPCTL_SNAK;
-				mmio_write_32(DIEPCTL(0), data);
-				data = mmio_read_32(DOEPCTL(0)) | DXEPCTL_SNAK;
-				mmio_write_32(DOEPCTL(0), data);
-				/*clear IN EP intr*/
-				mmio_write_32(DIEPINT(0), ~0);
-				usb_handle_control_request((setup_packet *)&ctrl_req);
-			}
-
-			/* Make sure EP0 OUT is set up to accept the next request */
-			/* memset(p_ctrlreq, 0, NUM_ENDPOINTS*8); */
-			data = DOEPTSIZ0_SUPCNT(1) | DOEPTSIZ0_PKTCNT |
-				(64 << DOEPTSIZ0_XFERSIZE_SHIFT);
-			mmio_write_32(DOEPTSIZ0, data);
-			/*
-			 * IN Token Received When TxFIFO is Empty (INTknTXFEmp)
-			 * Indicates that an IN token was received when the associated TxFIFO (periodic/nonperiodic)
-			 * was empty. This interrupt is asserted on the endpoint for which the IN token
-			 * was received.
-			 */
-			// notes that:the compulsive conversion is expectable.
-			// Holds the start address of the external memory for storing or fetching endpoint data.
-			//dma_desc_ep0.status.b.bs = 0x3;
-#ifdef DEBUG_DW_UDC_DMA
-			//memset(&ctrl_req, 0, sizeof(setup_packet));
-			// EP0 OUT
-			//NOTICE("#%s, %d\n", __func__, __LINE__);
-			dwc2_start_dma((uintptr_t)&ctrl_req, 0, 0, 64);
-			//NOTICE("#%s, %d\n", __func__, __LINE__);
-#else
-			dma_desc_ep0.status.b.mtrf = 0;
-			dma_desc_ep0.status.b.sr = 0;
-			dma_desc_ep0.status.b.l = 1;
-			dma_desc_ep0.status.b.ioc = 1;
-			dma_desc_ep0.status.b.sp = 0;
-			dma_desc_ep0.status.b.bytes = 64;
-			dma_desc_ep0.buf = (uintptr_t)&ctrl_req;
-			dma_desc_ep0.status.b.sts = 0;
-			dma_desc_ep0.status.b.bs = 0x0;
-			mmio_write_32(DOEPDMA0, (uintptr_t)&dma_desc_ep0);
-			// endpoint enable; clear NAK
-			mmio_write_32(DOEPCTL0, 0x84000000);
-#endif
-		}
-
-		epints = mmio_read_32(DOEPINT1);
-		if(epints) {
-			mmio_write_32(DOEPINT1, epints);
-			//INFO("OUT EP1: epints :0x%x,DOEPTSIZ1 :0x%x.\n",epints, mmio_read_32(DOEPTSIZ1));
-			/* Transfer Completed Interrupt (XferCompl);Transfer completed */
-			if (epints & DXEPINT_XFERCOMPL) {
-				/* ((readl(DOEPTSIZ(1))) & 0x7FFFF is Transfer Size (XferSize) */
-				/*int bytes = (p_endpoints + 1)->size - ((readl(DOEPTSIZ(1))) & 0x7FFFF);*/
-				int bytes = rx_desc_bytes - dma_desc.status.b.bytes;
-				//INFO("OUT EP1: recv %d bytes , buf:0x%lx\n",bytes, (uintptr_t)rx_req.buf);
-				if (endpoints[1].busy) {
-					endpoints[1].busy = 0;
-					endpoints[1].rc = 0;
-					endpoints[1].done = 1;
-					if (rx_req.complete == usb_rx_cmd_complete) {
-						//NOTICE("recv command\n");
-						//fastboot_handle_command(rx_req.buf, bytes);
-					} else if (rx_req.complete == usb_rx_data_complete) {
-						//NOTICE("recv data\n");
-						rx_req.complete(bytes, 0);
-						//fastboot_receive_data(rx_req.buf, bytes);
-					} else {
-						ERROR("#%s, %d, error\n", __func__, __LINE__);
-					}
-				}
-			}
-
-			if (epints & DXEPINT_AHBERR) { /* AHB error */
-				WARN("AHB error on OUT EP1.\n");
-			}
-			if (epints & DXEPINT_SETUP) { /* SETUP phase done */
-				WARN("SETUP phase done  on OUT EP1.\n");
-			}
-		}
-	}
-#endif
-	/* write to clear interrupts */
-	mmio_write_32(GINTSTS, ints);
 }
 
 #define EYE_PATTERN	0x70533483
@@ -1098,9 +918,9 @@ static void usb_rx_cmd_complete(unsigned actual, int stat)
 	for (;;);
 }
 
-static void usbloader_init(void)
+static void dwc2_init(void)
 {
-	VERBOSE("enter usbloader_init\n");
+	VERBOSE("enter dwc2_init\n");
 
 	/*usb sw and hw init*/
 	init_usb();
@@ -1119,7 +939,7 @@ static void usbloader_init(void)
 	rx_req.buf = cmdbuf;
 	tx_req.buf = cmdbuf;
 
-	VERBOSE("exit usbloader_init\n");
+	VERBOSE("exit dwc2_init\n");
 }
 
 void usb_reinit()
@@ -1134,11 +954,6 @@ void usb_reinit()
 int fastboot_device_is_attached(void)
 {
 	return 0;
-}
-
-void fastboot_device_handle_interrupts(void)
-{
-	usb_poll();
 }
 
 void dw_udc_wait_rx(void)
@@ -1407,13 +1222,13 @@ void dwc2_prepare_recv_setup(void)
 	 * Set STALL for setup packet. The STALL signal should be set before
 	 * DMA transition. And it could be cleared after DMA transition.
 	 */
-	usb_drv_stall(0, 1, 0);
+	dwc2_set_stall(0, 1, 1);
+	dwc2_set_stall(0, 1, 0);
 
 	/* prepare to accept next setup packet */
 	data = DOEPTSIZ0_SUPCNT(1) | DOEPTSIZ0_PKTCNT |
 		(64 << DOEPTSIZ0_XFERSIZE_SHIFT);
 	mmio_write_32(DOEPTSIZ0, data);
-	NOTICE("#%s, %d, DOEPTSIZ0:0x%x\n", __func__, __LINE__, mmio_read_32(DOEPTSIZ0));
 	dwc2_start_dma(HIKEY_MMC_DATA_BASE, 0, 0, 64);
 }
 
@@ -1423,8 +1238,8 @@ int dwc2_poll(usb_interrupt_t *usb_intr, size_t *size)
 	int timeout = DW_UDC_TIMEOUT;
 
 	assert((usb_intr != NULL) && (size != NULL));
-	//for (timeout = DW_UDC_TIMEOUT; timeout > 0; timeout--) {
-	for (;;) {
+	for (timeout = DW_UDC_TIMEOUT; timeout > 0; timeout--) {
+	//for (;;) {
 		ints = mmio_read_32(GINTSTS);
 		mmio_write_32(GINTSTS, ints);
 
@@ -1526,8 +1341,8 @@ int dwc2_set_addr(int addr)
 	return 0;
 }
 
-int dwc2_get_descriptor(setup_packet *setup,
-			struct usb_device_descriptor *descriptor)
+static int dwc2_get_descriptor(setup_packet *setup,
+			       struct usb_device_descriptor *descriptor)
 {
 	uint32_t data;
 
@@ -1567,104 +1382,9 @@ int dwc2_get_descriptor(setup_packet *setup,
 	return 0;
 }
 
-static setup_packet setup;
-
-int usb_handle_setup_packet(uintptr_t buf, size_t size)
+int dwc2_submit_packet(int ep_idx, uintptr_t buf, size_t size)
 {
-	struct usb_device_descriptor *descriptor;
-	int result;
-
-	assert(size > 0);
-	memcpy(&setup, (void *)buf, size);
-	switch (setup.request) {
-	case USB_REQ_GET_STATUS:
-		NOTICE("#get status\n");
-		break;
-	case USB_REQ_CLEAR_FEATURE:
-		NOTICE("#clear feature\n");
-		if ((setup.type == USB_RECIP_ENDPOINT) &&
-		    (setup.value == USB_ENDPOINT_HALT)) {
-			NOTICE("#%s, %d\n", __func__, __LINE__);
-			usb_drv_stall(setup.index & 0xf, 0,
-				      setup.index >> 7);
-		}
-		size = 0;
-		break;
-	case USB_REQ_SET_FEATURE:
-		NOTICE("#set feature\n");
-		break;
-	case USB_REQ_SET_ADDRESS:
-		NOTICE("#set address (%d)\n", setup.value);
-		result = usb_ops.set_addr(setup.value);
-		assert(result == 0);
-		break;
-	case USB_REQ_GET_DESCRIPTOR:
-		NOTICE("#descr\n");
-		size = sizeof(struct usb_device_descriptor);
-		descriptor = (struct usb_device_descriptor *)buf;
-		memset(descriptor, 0, size);
-		result = usb_ops.get_descriptor(&setup, descriptor);
-		assert((size <= 64) && (size > 0));
-		assert(result == 0);
-		break;
-	case USB_REQ_GET_CONFIGURATION:
-		NOTICE("#get configuration\n");
-		break;
-	case USB_REQ_SET_CONFIGURATION:
-		NOTICE("#set configuration\n");
-		break;
-	case USB_REQ_GET_INTERFACE:
-		NOTICE("#get interface\n");
-		break;
-	case USB_REQ_SET_INTERFACE:
-		NOTICE("set interface\n");
-		break;
-	default:
-		NOTICE("not matched. request:0x%x\n", setup.request);
-		assert(0);
-		break;
-	}
-
-#if 1
-//	NOTICE("#%s, %d, size:%d\n", __func__, __LINE__, (uint32_t)size);
-	if (size > 0) {
-		/* clear STALL to send out response back */
-		usb_drv_stall(0, 0, 1);		// IN
-		usb_drv_stall(0, 0, 0);		// OUT
-		usb_drv_send_nonblocking(0, (void *)buf, size);
-		//dw_udc_epx_tx(0, (void *)buf, size);
-//		NOTICE("#%s, %d\n", __func__, __LINE__);
-	} else if (size == 0) {
-		/* send an empty packet */
-		usb_drv_send_nonblocking(0, NULL, 0);
-	}
-#endif
-	return 0;
-}
-
-int usb_handle_data_packet(uintptr_t buf, size_t size)
-{
-	return 0;
-}
-
-/*
- * input: buf
- * output: usb_intr & size
- */
-int usb_wait_for_interrupt(uintptr_t buf, usb_interrupt_t *usb_intr,
-			   size_t *size)
-{
-	int result;
-
-	/* poll interrupt in dwc2 layer */
-	assert((usb_intr != NULL) && (size != NULL));
-	result = usb_ops.poll(usb_intr, size);
-	NOTICE("#%s, %d, result:%d, type:%d\n", __func__, __LINE__, result, usb_intr->type);
-	return result;
-}
-
-int dwc2_submit_packet(uintptr_t buf, size_t size)
-{
+#if 0
 	assert(tx_req.buf != 0);
 
 	memcpy(tx_req.buf, (void *)buf, size + 1);
@@ -1672,114 +1392,23 @@ int dwc2_submit_packet(uintptr_t buf, size_t size)
 	tx_req.complete = 0;
 	dw_udc_epx_tx(ep1in.num, tx_req.buf, tx_req.length);
 	return 0;
+#else
+	NOTICE("#%s, %d\n", __func__, __LINE__);
+	ep_send(ep_idx, (void *)buf, size);
+	NOTICE("#%s, %d\n", __func__, __LINE__);
+	return 0;
+#endif
 }
 
-int usb_enum(void)
-{
-	usb_interrupt_t intr;
-	size_t size;
-	int result;
-
-	usbloader_init();
-	usb_enum_done = 0;
-	do {
-		result = usb_wait_for_interrupt(0x10000000, &intr, &size);
-		assert((result == 0) &&
-		       (intr.type >= USB_INT_OUT_SETUP) &&
-		       (intr.type < USB_INT_INVALID));
-		NOTICE("#%s, %d, interrupt type:%d, ep:%d, size:0x%lx\n",
-			__func__, __LINE__, intr.type, intr.ep_idx, size);
-		switch (intr.type) {
-		case USB_INT_OUT_SETUP:
-			result = usb_handle_setup_packet(0x10000000, size);
-			break;
-		case USB_INT_OUT_DATA:
-			//result = usb_handle_data_packet(buf, *size);
-			break;
-		case USB_INT_IN:
-			break;
-		case USB_INT_ENUM_DONE:
-			break;
-		case USB_INT_RESET:
-			break;
-		default:
-			assert(0);
-		}
-	} while (usb_enum_done == 0);
-	return result;
-}
-
-/* usb layer */
-static usb_ops_t usb_ops = {
-	/*
-	.handle_setup_packet	= usb_handle_setup_packet,
-	.handle_data_packet	= usb_handle_data_packet,
-	*/
+static const usb_ops_t dwc2_ops = {
 	.get_descriptor		= dwc2_get_descriptor,
+	.init			= dwc2_init,
 	.poll			= dwc2_poll,
 	.set_addr		= dwc2_set_addr,
 	.submit_packet		= dwc2_submit_packet
 };
 
-void usb_init(usb_ops_t *ops_ptr)
+void dw_udc_init(fastboot_params_t *params)
 {
-	assert((ops_ptr != NULL) &&			\
-	       (ops_ptr->get_descriptor != NULL) &&	\
-	       (ops_ptr->poll != NULL) &&		\
-	       (ops_ptr->submit_packet != NULL));
-	usb_ops.get_descriptor = ops_ptr->get_descriptor;
-	usb_ops.poll = ops_ptr->poll;
-	usb_ops.set_addr = ops_ptr->set_addr;
-	usb_ops.submit_packet = ops_ptr->submit_packet;
-
-	usb_enum();
-}
-
-int usb_read(uintptr_t buf, size_t *size)
-{
-	int result;
-	usb_interrupt_t usb_interrupt;
-
-	assert(size != NULL);
-	result = usb_wait_for_interrupt(buf, &usb_interrupt, size);
-	assert((result == 0) &&
-	       (usb_interrupt.type >= USB_INT_OUT_SETUP) &&
-	       (usb_interrupt.type < USB_INT_INVALID));
-	switch (usb_interrupt.type) {
-	case USB_INT_OUT_SETUP:
-		NOTICE("#%s, %d, size:%ld\n", __func__, __LINE__, *size);
-		result = usb_handle_setup_packet(buf, *size);
-		/* don't need fastboot protocol to handle it */
-		*size = 0;
-		break;
-	case USB_INT_OUT_DATA:
-		result = usb_handle_data_packet(buf, *size);
-		break;
-	case USB_INT_IN:
-		/* return IN event to fastboot? */
-		break;
-	case USB_INT_ENUM_DONE:
-		break;
-	case USB_INT_RESET:
-		break;
-	default:
-		assert(0);
-	}
-	return result;
-}
-
-int usb_write(uintptr_t buf, size_t size)
-{
-	return usb_ops.submit_packet(buf, size);
-}
-
-static fastboot_ops_t fb_ops = {
-	.read	= usb_read,
-	.write	= usb_write
-};
-
-void dw_udc_init(void)
-{
-	usb_init(&usb_ops);
-	fastboot_init(&fb_ops);
+	usb_init(&dwc2_ops, params);
 }
