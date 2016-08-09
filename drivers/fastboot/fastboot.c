@@ -70,8 +70,8 @@ typedef enum {
 typedef struct fastboot_handle {
 	uintptr_t	io_dev_handle;
 	protocol_state	state;
-	int		(*read)(size_t *size);
-	int		(*write)(char *buf, size_t size);
+	int		(*read)(uintptr_t buf, size_t *size);
+	int		(*write)(uintptr_t buf, size_t size);
 } fastboot_handle_t;
 
 struct fastboot_cmd {
@@ -198,7 +198,7 @@ static void fastboot_ack(fastboot_handle_t *handle, const char *code,
 		snprintf(response, FASTBOOT_RESPONSE_LENGTH, "%s%s",
 			 code, reason);
 		handle->state = STATE_COMPLETE;
-		handle->write(response, strlen(response));
+		handle->write((uintptr_t)response, strlen(response));
 		rx_cmd();
 	} else {
 		assert(0);
@@ -220,7 +220,7 @@ static void fastboot_data(fastboot_handle_t *handle, const char *reason)
 	char response[FASTBOOT_RESPONSE_LENGTH];
 
 	snprintf(response, FASTBOOT_RESPONSE_LENGTH, "DATA%s", reason);
-	handle->write(response, strlen(response));
+	handle->write((uintptr_t)response, strlen(response));
 }
 
 static void fastboot_info(fastboot_handle_t *handle, const char *reason)
@@ -228,7 +228,7 @@ static void fastboot_info(fastboot_handle_t *handle, const char *reason)
 	char response[FASTBOOT_RESPONSE_LENGTH];
 
 	snprintf(response, FASTBOOT_RESPONSE_LENGTH, "INFO%s", reason);
-	handle->write(response, strlen(response));
+	handle->write((uintptr_t)response, strlen(response));
 }
 
 static void cmd_boot(fastboot_handle_t *handle, char *arg)
@@ -246,7 +246,9 @@ static void cmd_continue(fastboot_handle_t *handle, char *arg)
 static void cmd_download(fastboot_handle_t *handle, char *arg)
 {
 	unsigned long size;
+	size_t bytes_read;
 	char response[FASTBOOT_RESPONSE_LENGTH];
+	int result;
 
 	if (arg[0] == '\0') {
 		fastboot_fail(handle, "invalid parameter");
@@ -261,6 +263,7 @@ static void cmd_download(fastboot_handle_t *handle, char *arg)
 		assert(fb_params.size >= size);
 		debug_rx_info(fb_params.base, size);
 		fastboot_data(handle, response);
+#if 0
 		rx_data();
 		for (;;) {
 			fastboot_device_handle_interrupts();
@@ -269,6 +272,11 @@ static void cmd_download(fastboot_handle_t *handle, char *arg)
 				break;
 			}
 		}
+#else
+		result = handle->read(fb_params.base, &bytes_read);
+		assert(result != 0);
+		fastboot_okay(handle, NULL);
+#endif
 	}
 }
 
@@ -436,24 +444,29 @@ int fastboot_send(void)
 	return 0;
 }
 
-int fastboot_handle_command(void *buf, int length)
+int fastboot_handle_command(uintptr_t buf, int length)
 {
 	int i, num_cmds;
 
-	if ((buf == NULL) || (length <= 0)) {
+	NOTICE("#%s, %d\n", __func__, __LINE__);
+	if (buf == 0) {
 		WARN("%s, Invalid parameters.\n", __func__);
 		return -EINVAL;
+	}
+	if (length == 0) {
+		INFO("%s ignore\n", __func__);
+		return 0;
 	}
 	if (length > FASTBOOT_MAX_COMMAND_LENGTH)
 		length = FASTBOOT_MAX_COMMAND_LENGTH;
 	*((char *)buf + length) = '\0';
 	num_cmds = sizeof(cmds) / sizeof(struct fastboot_cmd);
 	for (i = 0; i < num_cmds; i++) {
-		if (memcmp(buf, cmds[i].cmd, strlen(cmds[i].cmd)))
+		if (memcmp((void *)buf, cmds[i].cmd, strlen(cmds[i].cmd)))
 			continue;
 		fb_handle.state = STATE_COMMAND;
 		cmds[i].execute(&fb_handle,
-				(void *)((uintptr_t)buf + strlen(cmds[i].cmd)));
+				(void *)(buf + strlen(cmds[i].cmd)));
 		if (fb_handle.state == STATE_COMMAND)
 			fastboot_fail(&fb_handle, "unknown reason");
 		return 0;
@@ -541,6 +554,7 @@ int fastboot_run(fastboot_params_t *params)
 {
 	size_t bytes_read;
 	int result;
+	int i = 0;
 
 	assert((params != 0) &&
 	       ((params->base & FASTBOOT_DATA_MASK) == 0) &&
@@ -559,8 +573,19 @@ int fastboot_run(fastboot_params_t *params)
 
 	while ((fb_handle.state != STATE_OFFLINE) &&
 	       (fb_handle.state != STATE_ERROR)) {
-#if 0
-		handle->read(&bytes_read);
+#if 1
+	NOTICE("#%s, %d\n", __func__, __LINE__);
+		/* wait for command from host */
+		result = fb_handle.read(fb_params.base, &bytes_read);
+		if (i++ > 3)
+			assert(0);
+	NOTICE("#%s, %d\n", __func__, __LINE__);
+		if (result == 0) {
+			fastboot_handle_command(fb_params.base,
+						bytes_read);
+		} else {
+			assert(0);
+		}
 #else
 		fastboot_device_handle_interrupts();
 #endif

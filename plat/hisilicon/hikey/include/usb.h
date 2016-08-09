@@ -32,6 +32,75 @@
 #ifndef __DWC_USB_H__
 #define __DWC_USB_H__
 
+typedef enum usb_interrupt_type {
+	USB_INT_OUT_SETUP,
+	USB_INT_OUT_DATA,
+	USB_INT_IN,
+	USB_INT_ENUM_DONE,
+	USB_INT_RESET,
+	USB_INT_INVALID
+} usb_interrupt_type_t;
+
+typedef struct usb_interrupt {
+	usb_interrupt_type_t	type;
+	int			ep_idx;
+} usb_interrupt_t;
+
+typedef struct {
+	unsigned char		type;
+	unsigned char		request;
+	unsigned short		value;
+	unsigned short		index;
+	unsigned short		length;
+} setup_packet;
+
+/*
+ * Standard requests, for the bRequest field of a SETUP packet.
+ *
+ * These are qualified by the bRequestType field, so that for example
+ * TYPE_CLASS or TYPE_VENDOR specific feature flags could be retrieved
+ * by a GET_STATUS request.
+ */
+#define USB_REQ_GET_STATUS              0x00
+#define USB_REQ_CLEAR_FEATURE           0x01
+#define USB_REQ_SET_FEATURE             0x03
+#define USB_REQ_SET_ADDRESS             0x05
+#define USB_REQ_GET_DESCRIPTOR          0x06
+#define USB_REQ_SET_DESCRIPTOR          0x07
+#define USB_REQ_GET_CONFIGURATION       0x08
+#define USB_REQ_SET_CONFIGURATION       0x09
+#define USB_REQ_GET_INTERFACE           0x0A
+#define USB_REQ_SET_INTERFACE           0x0B
+#define USB_REQ_SYNCH_FRAME             0x0C
+
+/* USB_DT_DEVICE: Device descriptor */
+struct usb_device_descriptor {
+        unsigned char  bLength;
+        unsigned char  bDescriptorType;
+
+        unsigned short bcdUSB;
+        unsigned char  bDeviceClass;
+        unsigned char  bDeviceSubClass;
+        unsigned char  bDeviceProtocol;
+        unsigned char  bMaxPacketSize0;
+        unsigned short idVendor;
+        unsigned short idProduct;
+        unsigned short bcdDevice;
+        unsigned char  iManufacturer;
+        unsigned char  iProduct;
+        unsigned char  iSerialNumber;
+        unsigned char  bNumConfigurations;
+} __attribute__ ((packed));
+
+#define USB_DT_DEVICE_SIZE              18
+
+typedef struct usb_ops {
+	int	(*get_descriptor)(setup_packet *setup, struct usb_device_descriptor *descriptor);
+	int	(*poll)(usb_interrupt_t *usb_intr, size_t *size);
+	int	(*set_addr)(int addr);
+	int	(*submit_packet)(uintptr_t buf, size_t size);
+} usb_ops_t;
+
 #define USB_DMA
 
 #define DWC_OTG_BASE			0xF72C0000
@@ -83,14 +152,6 @@
 #define DATA_IN_ENDPOINT_TX_FIFO13	0x00200720
 #define DATA_IN_ENDPOINT_TX_FIFO14	0x00200740
 #define DATA_IN_ENDPOINT_TX_FIFO15	0x00200760
-
-typedef struct {
-	unsigned char		type;
-	unsigned char		request;
-	unsigned short		value;
-	unsigned short		index;
-	unsigned short		length;
-} setup_packet;
 
 struct ept_queue_item {
 	unsigned int		next;
@@ -335,6 +396,8 @@ struct usb_request {
 #define DCFG_EPMISCNT_MASK		(0x1f << 18)
 #define DCFG_EPMISCNT_SHIFT		18
 #define DCFG_NZ_STS_OUT_HSHK		(1 << 2)
+#define DCFG_DEVADDR_MASK		(0x7f << 4)
+#define DCFG_DEVADDR(_x)		(((_x) & 0x7f) << 4)
 
 #define DCTL        		(DWC_OTG_BASE + 0x804)
 #define DCTL_CGNPINNAK		(1 << 8)
@@ -436,6 +499,7 @@ struct usb_request {
 #define DXEPCTL_SETEVENFR		(1 << 28)
 #define DXEPCTL_SNAK			(1 << 27)
 #define DXEPCTL_CNAK			(1 << 26)
+#define DXEPCTL_STALL			(1 << 21)
 #define DXEPCTL_NAKSTS			(1 << 17)
 #define DXEPCTL_DPID			(1 << 16)
 #define DXEPCTL_EOFRNUM			(1 << 16)
@@ -444,7 +508,8 @@ struct usb_request {
 #define DXEPCTL_NEXTEP_SHIFT		11
 #define DXEPCTL_NEXTEP_LIMIT		0xf
 #define DXEPCTL_NEXTEP(_x)		((_x) << 11)
-#define DOEPCTL_STALL			(1 << 21)
+#define DXEPCTL_MPS_MASK		0x7ff
+#define DXEPCTL_MPS(_x)			((_x) & 0x7ff)
 #define DOEPCTL_USBACTEP		(1 << 15)
 
 
@@ -649,46 +714,6 @@ struct usb_request {
 #define USB_ENDPOINT_XFER_BULK          2
 #define USB_ENDPOINT_XFER_INT           3
 #define USB_ENDPOINT_MAX_ADJUSTABLE     0x80
-
-/*
- * Standard requests, for the bRequest field of a SETUP packet.
- *
- * These are qualified by the bRequestType field, so that for example
- * TYPE_CLASS or TYPE_VENDOR specific feature flags could be retrieved
- * by a GET_STATUS request.
- */
-#define USB_REQ_GET_STATUS              0x00
-#define USB_REQ_CLEAR_FEATURE           0x01
-#define USB_REQ_SET_FEATURE             0x03
-#define USB_REQ_SET_ADDRESS             0x05
-#define USB_REQ_GET_DESCRIPTOR          0x06
-#define USB_REQ_SET_DESCRIPTOR          0x07
-#define USB_REQ_GET_CONFIGURATION       0x08
-#define USB_REQ_SET_CONFIGURATION       0x09
-#define USB_REQ_GET_INTERFACE           0x0A
-#define USB_REQ_SET_INTERFACE           0x0B
-#define USB_REQ_SYNCH_FRAME             0x0C
-
-/* USB_DT_DEVICE: Device descriptor */
-struct usb_device_descriptor {
-        unsigned char  bLength;
-        unsigned char  bDescriptorType;
-
-        unsigned short bcdUSB;
-        unsigned char  bDeviceClass;
-        unsigned char  bDeviceSubClass;
-        unsigned char  bDeviceProtocol;
-        unsigned char  bMaxPacketSize0;
-        unsigned short idVendor;
-        unsigned short idProduct;
-        unsigned short bcdDevice;
-        unsigned char  iManufacturer;
-        unsigned char  iProduct;
-        unsigned char  iSerialNumber;
-        unsigned char  bNumConfigurations;
-} __attribute__ ((packed));
-
-#define USB_DT_DEVICE_SIZE              18
 
 /*
  * Device and/or Interface Class codes

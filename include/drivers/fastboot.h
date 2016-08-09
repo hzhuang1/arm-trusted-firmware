@@ -71,8 +71,8 @@ typedef struct fastboot_params {
 } fastboot_params_t;
 
 typedef struct fastboot_ops {
-	int		(*read)(size_t *size);
-	int		(*write)(char *buf, size_t size);
+	int		(*read)(uintptr_t buf, size_t *size);
+	int		(*write)(uintptr_t buf, size_t size);
 } fastboot_ops_t;
 
 int fastboot_run(fastboot_params_t *params);
@@ -85,13 +85,8 @@ void fastboot_set_var(const char *name, const char *value,
 void fastboot_register_command(const char *name,
 			       int (*callback)(const char *arg));
 
-extern void fb_download(char *cmdbuf);
-extern void fb_flash(char *cmdbuf);
-extern void fb_reboot(char *cmdbuf);
-extern void fb_getvar(char *cmdbuf);
 extern void rx_cmd(void);
 extern void rx_data(void);
-extern int fastboot_handle_command(void *buf, int length);
 extern void fastboot_init(const fastboot_ops_t *ops_ptr);
 
 extern void debug_rx_info(uintptr_t buf, unsigned long len);
