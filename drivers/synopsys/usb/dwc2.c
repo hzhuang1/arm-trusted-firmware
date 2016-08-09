@@ -113,7 +113,9 @@ __attribute__ ((section("tzfw_coherent_mem")));
 
 void dwc2_start_dma(uintptr_t buf, int in, int ep, size_t size);
 
-dwc_otg_dev_dma_desc_t dwc2_dma_desc
+dwc_otg_dev_dma_desc_t dwc2_dma_out_desc
+__attribute__ ((section("tzfw_coherent_mem")));
+dwc_otg_dev_dma_desc_t dwc2_dma_in_desc
 __attribute__ ((section("tzfw_coherent_mem")));
 
 static struct usb_config_bundle config_bundle
@@ -210,8 +212,6 @@ static void reset_endpoints(void)
 	/* Enable interrupts on Ep0 */
 	mmio_write_32(DAINTMSK, 0x00010001);
 
-	dwc2_prepare_recv_setup();
-
 	INFO("exit reset_endpoints. \n");
 }
 
@@ -219,24 +219,31 @@ void dwc2_start_dma(uintptr_t buf, int in, int ep, size_t size)
 {
 	uint32_t data;
 
-	data = DMAC_DES0_LAST | DMAC_DES0_IOC |	DMAC_DES0_BYTES((uint32_t)size);
-	memcpy(&dwc2_dma_desc.status, &data, sizeof(uint32_t));
-	dwc2_dma_desc.buf = (uint32_t)buf;
-	NOTICE("#%s, in:%d, buf:0x%x, size:0x%lx\n", __func__, in, dwc2_dma_desc.buf, size);
+	data = DMAC_DES0_LAST | DMAC_DES0_IOC |	/*DMAC_DES0_BS_HOST_BUSY |*/ \
+	       DMAC_DES0_BYTES((uint32_t)size);
 
 	if (in) {
+		//NOTICE("#%s, in buf:0x%lx, size:0x%lx\n", __func__, buf, size);
 		if (size)
 			clean_dcache_range(buf, size);
-		mmio_write_32(DIEPDMA(ep), (uint32_t)((uintptr_t)&dwc2_dma_desc));
+		data |= DMAC_DES0_SP;
+		memcpy(&dwc2_dma_in_desc.status, &data, sizeof(uint32_t));
+		dwc2_dma_in_desc.buf = (uint32_t)buf;
+		clean_dcache_range((uintptr_t)&dwc2_dma_in_desc, 64);
+		mmio_write_32(DIEPDMA(ep), (uint32_t)((uintptr_t)&dwc2_dma_in_desc));
 		data = mmio_read_32(DIEPCTL(ep));
-		data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
+		data |= DXEPCTL_EPENA | DXEPCTL_CNAK | DXEPCTL_USBACTEP;
 		mmio_write_32(DIEPCTL(ep), data);
 	} else {
+		//NOTICE("#%s, out buf:0x%lx, size:0x%lx\n", __func__, buf, size);
 		if (size)
 			inv_dcache_range(buf, size);
-		mmio_write_32(DOEPDMA(ep), (uint32_t)((uintptr_t)&dwc2_dma_desc));
+		memcpy(&dwc2_dma_out_desc.status, &data, sizeof(uint32_t));
+		dwc2_dma_out_desc.buf = (uint32_t)buf;
+		clean_dcache_range((uintptr_t)&dwc2_dma_out_desc, 64);
+		mmio_write_32(DOEPDMA(ep), (uint32_t)((uintptr_t)&dwc2_dma_out_desc));
 		data = mmio_read_32(DOEPCTL(ep));
-		data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
+		data |= DXEPCTL_EPENA | DXEPCTL_CNAK | DXEPCTL_USBACTEP;
 		mmio_write_32(DOEPCTL(ep), data);
 	}
 }
@@ -364,6 +371,15 @@ void usb_config(void)
 
 	/* Soft Reconnect */
 	mmio_write_32(DCTL, 0x800);
+
+#if 0
+	data = DOEPTSIZ0_SUPCNT(1) | DOEPTSIZ0_PKTCNT |
+		(8 << DOEPTSIZ0_XFERSIZE_SHIFT);
+#else
+	data = DOEPTSIZ0_SUPCNT(1) | DOEPTSIZ0_PKTCNT |
+		(32 << DOEPTSIZ0_XFERSIZE_SHIFT);
+#endif
+	mmio_write_32(DOEPTSIZ0, data);
 	VERBOSE("exit usb_config.\n");
 }
 
@@ -403,32 +419,10 @@ static void ep_send(int ep, const void *ptr, int len)
 	// EPx IN
 	if (!len) {
 		mmio_write_32(DIEPTSIZ(ep), DXEPTSIZ_PKTCNT(1));
-		dwc2_start_dma(0, 1, ep, len);
+		dwc2_start_dma(0, 1, ep, 0);
 	} else {
 		mmio_write_32(DIEPTSIZ(ep), len | DXEPTSIZ_PKTCNT(packets));
 		dwc2_start_dma((uintptr_t)ptr, 1, ep, len);
-	}
-}
-
-void dwc2_set_stall(int endpoint, char stall, char in)
-{
-	unsigned int data;
-
-	/*
-	 * STALL Handshake (Stall)
-	 */
-
-	data = mmio_read_32(DIEPCTL(endpoint));
-	if (in) {
-		if (stall)
-			mmio_write_32(DIEPCTL(endpoint), data | DXEPCTL_STALL);
-		else
-			mmio_write_32(DIEPCTL(endpoint), data & ~DXEPCTL_STALL);
-	} else {
-		if (stall)
-			mmio_write_32(DOEPCTL(endpoint), data | DXEPCTL_STALL);
-		else
-			mmio_write_32(DOEPCTL(endpoint), data & ~DXEPCTL_STALL);
 	}
 }
 
@@ -584,9 +578,6 @@ void usb_handle_control_request(setup_packet* req)
 		break;
 
 	case USB_REQ_CLEAR_FEATURE:
-		if ((req->type == USB_RECIP_ENDPOINT) &&
-		    (req->value == USB_ENDPOINT_HALT))
-			dwc2_set_stall(req->index & 0xf, 0, req->index >> 7);
 		size = 0;
 		break;
 
@@ -712,11 +703,7 @@ void usb_handle_control_request(setup_packet* req)
 	if (!size) {
 		usb_drv_send_nonblocking(0, 0, 0);  // send an empty packet
 	} else if (size == -1) { // stall:Applies to non-control, non-isochronous IN and OUT endpoints only.
-		dwc2_set_stall(0, 1, 1);     // IN
-		dwc2_set_stall(0, 1, 0);     // OUT
 	} else { // stall:Applies to control endpoints only.
-		dwc2_set_stall(0, 0, 1);     // IN
-		dwc2_set_stall(0, 0, 0);     // OUT
 
 		usb_drv_send_nonblocking(0, addr, size > req->length ? req->length : size);
 	}
@@ -944,7 +931,7 @@ void dw_udc_epx_rx(int ep, void *buf, int len)
 
 	if (len == 0) {
 		/* one empty packet */
-		mmio_write_32(DOEPTSIZ(ep), DXEPTSIZ_PKTCNT(1));
+		//mmio_write_32(DOEPTSIZ(ep), DXEPTSIZ_PKTCNT(1));
 		dma_desc.status.b.bytes = 0;
 		dma_desc.buf = 0;
 	} else {
@@ -1077,19 +1064,7 @@ void dw_udc_epx_tx(int ep, void *buf, int len)
 
 void dwc2_prepare_recv_setup(void)
 {
-	uint32_t data;
-
-	/*
-	 * Set STALL for setup packet. The STALL signal should be set before
-	 * DMA transition. And it could be cleared after DMA transition.
-	 */
-	dwc2_set_stall(0, 1, 1);
-	dwc2_set_stall(0, 1, 0);
-
 	/* prepare to accept next setup packet */
-	data = DOEPTSIZ0_SUPCNT(1) | DOEPTSIZ0_PKTCNT |
-		(64 << DOEPTSIZ0_XFERSIZE_SHIFT);
-	mmio_write_32(DOEPTSIZ0, data);
 	dwc2_start_dma(HIKEY_MMC_DATA_BASE, 0, 0, 64);
 }
 
@@ -1099,8 +1074,8 @@ int dwc2_poll(usb_interrupt_t *usb_intr, size_t *size)
 	int timeout = DW_UDC_TIMEOUT;
 
 	assert((usb_intr != NULL) && (size != NULL));
-	for (timeout = DW_UDC_TIMEOUT; timeout > 0; timeout--) {
-	//for (;;) {
+	//for (timeout = DW_UDC_TIMEOUT; timeout > 0; timeout--) {
+	for (;;) {
 		ints = mmio_read_32(GINTSTS);
 		mmio_write_32(GINTSTS, ints);
 
@@ -1126,8 +1101,6 @@ int dwc2_poll(usb_interrupt_t *usb_intr, size_t *size)
 			mmio_write_32(DOEPCTL(1), data | max_packet_size);
 			usb_intr->type = USB_INT_ENUM_DONE;
 			*size = 0;
-
-			dwc2_prepare_recv_setup();
 			break;
 		}
 
@@ -1137,23 +1110,60 @@ int dwc2_poll(usb_interrupt_t *usb_intr, size_t *size)
 				if (epints & DXEPINT_AHBERR) {
 					assert(0);
 				}
-				if (epints & DXEPINT_XFERCOMPL) {
-					data = mmio_read_32(DOEPTSIZ(0));
-					NOTICE("OE0 Rx:0x%x, 0x%x\n", data, DXEPTSIZ_XFERSIZE_GET(data));
-					usb_intr->type = USB_INT_OUT_DATA;
-					usb_intr->ep_idx = 0;
-					*size = DXEPTSIZ_XFERSIZE_GET(data);
-					epints = mmio_read_32(DOEPINT(0));
-				}
+#if 0
 				if (epints & DXEPINT_SETUP) {
-					if ((epints & DXEPINT_XFERCOMPL) == 0)
-						assert(0);
 					data = mmio_read_32(DOEPTSIZ(0));
 					NOTICE("OE0 setup, size:0x%x\n", DXEPTSIZ_XFERSIZE_GET(data));
 					usb_intr->type = USB_INT_OUT_SETUP;
 					usb_intr->ep_idx = 0;
 					*size = DXEPTSIZ_XFERSIZE_GET(data);
+					data = epints;
+					while ((data & DXEPINT_XFERCOMPL) == 0) {
+						data = mmio_read_32(DOEPINT(0));
+					}
+					/* Stall this end point */
+					data = mmio_read_32(DOEPCTL(0));
+					data |= DXEPCTL_STALL;
+					mmio_write_32(DOEPCTL(0), data);
+				} else if (epints & DXEPINT_XFERCOMPL) {
+					/* DMA finished only for data packet */
+					data = mmio_read_32(DOEPTSIZ(0));
+					NOTICE("OE0 Rx:0x%x, 0x%x\n", data, DXEPTSIZ_XFERSIZE_GET(data));
+					usb_intr->type = USB_INT_OUT_DATA;
+					usb_intr->ep_idx = 0;
+					*size = DXEPTSIZ_XFERSIZE_GET(data);
 				}
+				/* check dma status */
+				NOTICE("#%s, out, status:0x%x\n", __func__, dwc2_dma_out_desc.status.d32);
+#else
+				if (epints & DXEPINT_XFERCOMPL) {
+					data = mmio_read_32(DOEPTSIZ(0));
+					NOTICE("OE0 Rx:0x%x, 0x%x\n", data, DXEPTSIZ_XFERSIZE_GET(data));
+					*size = DXEPTSIZ_XFERSIZE_GET(data);
+					usb_intr->type = USB_INT_OUT_DATA;
+					usb_intr->ep_idx = 0;
+					//NOTICE("#%s, %d, bs:%d\n", __func__, __LINE__, dwc2_dma_out_desc.status.b.bs);
+					/* wait for DMA finished */
+					while (dwc2_dma_out_desc.status.b.bs != 2) {}
+					if (dwc2_dma_out_desc.status.b.sr) {
+						usb_intr->type = USB_INT_OUT_SETUP;
+						/* Stall this end point */
+						data = mmio_read_32(DOEPCTL(0));
+						data |= DXEPCTL_STALL;
+						mmio_write_32(DOEPCTL(0), data);
+						data = mmio_read_32(DIEPCTL(0));
+						data |= DXEPCTL_STALL;
+						mmio_write_32(DIEPCTL(0), data);
+					}
+					/*
+					if (dwc2_dma_out_desc.status.b.bytes) {
+						NOTICE("##%s, remained rx bytes:%d\n", __func__, dwc2_dma_out_desc.status.b.bytes);
+					}
+					*/
+				}
+#endif
+				/* clear interrupt */
+				epints = mmio_read_32(DOEPINT(0));
 				mmio_write_32(DOEPINT(0), epints);
 			}
 			break;
@@ -1167,16 +1177,17 @@ int dwc2_poll(usb_interrupt_t *usb_intr, size_t *size)
 				}
 				if (epints & DXEPINT_XFERCOMPL) {
 					data = mmio_read_32(DIEPTSIZ(0));
-					NOTICE("IE0 Tx:0x%x, 0x%x\n", data, DXEPTSIZ_XFERSIZE_GET(data));
+					//NOTICE("IE0 Tx:0x%x, 0x%x\n", data, DXEPTSIZ_XFERSIZE_GET(data));
 					usb_intr->type = USB_INT_IN;
 					usb_intr->ep_idx = 0;
 					*size = DXEPTSIZ_XFERSIZE_GET(data);
-
-					/* prepare to accept next setup packet */
-					dwc2_prepare_recv_setup();
+					/* check dma status */
+					while (dwc2_dma_in_desc.status.b.bs != 2) {}
+					//NOTICE("##%s, remained tx bytes:%d\n", __func__, dwc2_dma_in_desc.status.b.bytes);
 				}
+				//NOTICE("#%s, in, status:0x%x\n", __func__, dwc2_dma_in_desc.status.d32);
 				mmio_write_32(DIEPINT(0), epints);
-				NOTICE("dwc2 iepint\n");
+				//NOTICE("dwc2 iepint\n");
 			}
 			break;
 		}
@@ -1197,6 +1208,7 @@ int dwc2_set_addr(int addr)
 	data = mmio_read_32(DCFG);
 	data &= ~DCFG_DEVADDR_MASK;
 	mmio_write_32(DCFG, data | DCFG_DEVADDR(addr));
+	NOTICE("s\n");
 	return 0;
 }
 
@@ -1209,11 +1221,11 @@ static int dwc2_get_descriptor(setup_packet *setup,
 	data = setup->value >> 8;
 	switch (data) {
 	case USB_DT_DEVICE:
-		NOTICE("get dt device\n");
+		NOTICE("d\n");
+		//NOTICE("get dt device\n");
 		descriptor->bLength = sizeof(struct usb_device_descriptor);
 		descriptor->bDescriptorType = USB_DT_DEVICE;
-		/* what's this */
-		descriptor->bcdUSB = 0x0200;
+		descriptor->bcdUSB = 0x0200;		/* USB 2.0 */
 		descriptor->bDeviceClass = 0;
 		descriptor->bDeviceProtocol = 0;
 		descriptor->bMaxPacketSize0 = 64;
@@ -1229,7 +1241,7 @@ static int dwc2_get_descriptor(setup_packet *setup,
 		NOTICE("get dt other speed config\n");
 		break;
 	case USB_DT_CONFIG:
-		NOTICE("get dt config\n");
+		NOTICE("##get dt config\n");
 		break;
 	case USB_DT_STRING:
 		NOTICE("get dt string\n");
@@ -1238,6 +1250,21 @@ static int dwc2_get_descriptor(setup_packet *setup,
 		assert(0);
 		break;
 	}
+	return 0;
+}
+
+int dwc2_recv_setup(uintptr_t buf, size_t size)
+{
+	dwc2_start_dma(buf, 0, 0, size);
+	return 0;
+}
+
+int dwc2_setup_response(uintptr_t buf, size_t size)
+{
+	if (size)
+		ep_send(0, (void *)buf, size);
+	else
+		ep_send(0, NULL, size);
 	return 0;
 }
 
@@ -1261,7 +1288,9 @@ static const usb_ops_t dwc2_ops = {
 	.get_descriptor		= dwc2_get_descriptor,
 	.init			= dwc2_init,
 	.poll			= dwc2_poll,
+	.recv_setup		= dwc2_recv_setup,
 	.set_addr		= dwc2_set_addr,
+	.setup_response		= dwc2_setup_response,
 	.submit_packet		= dwc2_submit_packet
 };
 

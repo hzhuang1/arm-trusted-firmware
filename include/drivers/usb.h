@@ -97,7 +97,9 @@ typedef struct usb_ops {
 	int	(*get_descriptor)(setup_packet *setup, struct usb_device_descriptor *descriptor);
 	void	(*init)(void);
 	int	(*poll)(usb_interrupt_t *usb_intr, size_t *size);
+	int	(*recv_setup)(uintptr_t buf, size_t size);
 	int	(*set_addr)(int addr);
+	int	(*setup_response)(uintptr_t buf, size_t size);
 	int	(*submit_packet)(int ep_idx, uintptr_t buf, size_t size);
 } usb_ops_t;
 
