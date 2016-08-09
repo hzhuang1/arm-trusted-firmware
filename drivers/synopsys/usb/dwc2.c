@@ -53,7 +53,6 @@
 
 #define DW_UDC_TIMEOUT			1000000
 
-#define DEBUG_DW_UDC_DMA
 
 /* software is handling DMA descriptor */
 #define DMAC_DES0_BS_HOST_BUSY			(3 << 30)
@@ -112,12 +111,10 @@ __attribute__ ((section("tzfw_coherent_mem")));
 dwc_otg_dev_dma_desc_t dma_desc_addr
 __attribute__ ((section("tzfw_coherent_mem")));
 
-#ifdef DEBUG_DW_UDC_DMA
 void dwc2_start_dma(uintptr_t buf, int in, int ep, size_t size);
 
 dwc_otg_dev_dma_desc_t dwc2_dma_desc
 __attribute__ ((section("tzfw_coherent_mem")));
-#endif
 
 static struct usb_config_bundle config_bundle
 __attribute__ ((section("tzfw_coherent_mem")));
@@ -159,10 +156,6 @@ void dw_udc_epx_rx(int ep, void *buf, int len);
 static unsigned int rx_desc_bytes = 0;
 unsigned long rx_addr;
 unsigned long rx_length;
-#ifndef DEBUG_DW_UDC_DMA
-//#if 1
-static unsigned int last_one = 0;
-#endif
 int rx_data_complete = 0;
 #if 0
 static char *cmdbuf;
@@ -218,46 +211,13 @@ static void reset_endpoints(void)
 	mmio_write_32(DAINTMSK, 0x00010001);
 
 	dwc2_prepare_recv_setup();
-#if 0
-	/* EP0 OUT Transfer Size:64 Bytes, 1 Packet, 3 Setup Packet, Read to receive setup packet*/
-	data = DOEPTSIZ0_SUPCNT(1) | DOEPTSIZ0_PKTCNT |
-		(64 << DOEPTSIZ0_XFERSIZE_SHIFT);
-	mmio_write_32(DOEPTSIZ0, data);
-	NOTICE("#%s, %d, DOEPTSIZ0:0x%x\n", __func__, __LINE__, mmio_read_32(DOEPTSIZ0));
-	//notes that:the compulsive conversion is expectable.
-	//dma_desc_ep0.status.b.bs = 0x3;
-#ifdef DEBUG_DW_UDC_DMA
-	// EP0 OUT
-	dwc2_start_dma(HIKEY_MMC_DATA_BASE, 0, 0, 64);
-	//dwc2_start_dma((uintptr_t)&ctrl_req, 0, 0, 64);
-#else
-	dma_desc_ep0.status.b.mtrf = 0;
-	dma_desc_ep0.status.b.sr = 0;
-	dma_desc_ep0.status.b.l = 1;
-	dma_desc_ep0.status.b.ioc = 1;
-	dma_desc_ep0.status.b.sp = 0;
-	dma_desc_ep0.status.b.bytes = 64;
-	dma_desc_ep0.buf = (unsigned long)&ctrl_req;
-	dma_desc_ep0.status.b.sts = 0;
-	dma_desc_ep0.status.b.bs = 0x0;
-	mmio_write_32(DOEPDMA0, ((unsigned long)&(dma_desc_ep0)));
-	VERBOSE("%s, &ctrl_req:%llx:%x, &dms_desc_ep0:%llx:%x\n",
-		__func__, (unsigned long)&ctrl_req, (unsigned long)&ctrl_req,
-		(unsigned long)&dma_desc_ep0, (unsigned long)&dma_desc_ep0);
-	/* EP0 OUT ENABLE CLEARNAK */
-	data = mmio_read_32(DOEPCTL0);
-	mmio_write_32(DOEPCTL0, (data | 0x84000000));
-#endif
-#endif
 
 	INFO("exit reset_endpoints. \n");
 }
 
-#ifdef DEBUG_DW_UDC_DMA
 void dwc2_start_dma(uintptr_t buf, int in, int ep, size_t size)
 {
 	uint32_t data;
-	//int timeout = DW_UDC_TIMEOUT;
 
 	data = DMAC_DES0_LAST | DMAC_DES0_IOC |	DMAC_DES0_BYTES((uint32_t)size);
 	memcpy(&dwc2_dma_desc.status, &data, sizeof(uint32_t));
@@ -271,19 +231,6 @@ void dwc2_start_dma(uintptr_t buf, int in, int ep, size_t size)
 		data = mmio_read_32(DIEPCTL(ep));
 		data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
 		mmio_write_32(DIEPCTL(ep), data);
-#if 0
-		/* polling for INT */
-		do {
-			data = mmio_read_32(DIEPINT(ep));
-			if (--timeout == 0) {
-				NOTICE("IN Timeout\n");
-				break;
-			}
-			udelay(10);
-		} while (data == 0);
-		//NOTICE("#%s, %d, DIEPINT(%d):0x%x\n", __func__, __LINE__, ep, data);
-		//} while ((data & DXEPINT_XFERCOMPL) == 0);
-#endif
 	} else {
 		if (size)
 			inv_dcache_range(buf, size);
@@ -291,22 +238,8 @@ void dwc2_start_dma(uintptr_t buf, int in, int ep, size_t size)
 		data = mmio_read_32(DOEPCTL(ep));
 		data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
 		mmio_write_32(DOEPCTL(ep), data);
-#if 0
-		/* polling for INT */
-		do {
-			data = mmio_read_32(DOEPINT(ep));
-			if (--timeout == 0) {
-				NOTICE("OUT Timeout");
-				break;
-			}
-			udelay(10);
-		} while (data == 0);
-		//NOTICE("#%s, %d, DOEPINT(%d):0x%x\n", __func__, __LINE__, ep, data);
-		//} while ((data & DXEPINT_XFERCOMPL) == 0);
-#endif
 	}
 }
-#endif
 
 static int usb_drv_request_endpoint(int type, int dir)
 {
@@ -467,8 +400,6 @@ static void ep_send(int ep, const void *ptr, int len)
 	data = mmio_read_32(DIEPCTL(ep)) | DXEPCTL_USBACTEP;
 	mmio_write_32(DIEPCTL(ep), data);
 
-	NOTICE("#%s, ep:%d, len:%d, packets:%d\n", __func__, ep, len, packets);
-#ifdef DEBUG_DW_UDC_DMA
 	// EPx IN
 	if (!len) {
 		mmio_write_32(DIEPTSIZ(ep), DXEPTSIZ_PKTCNT(1));
@@ -477,29 +408,6 @@ static void ep_send(int ep, const void *ptr, int len)
 		mmio_write_32(DIEPTSIZ(ep), len | DXEPTSIZ_PKTCNT(packets));
 		dwc2_start_dma((uintptr_t)ptr, 1, ep, len);
 	}
-#else
-	/* set DMA Address */
-	if (!len) {
-		/* send one empty packet */
-		dma_desc_in.buf = 0;
-	} else {
-		dma_desc_in.buf = (unsigned long)ptr;
-	}
-	//dma_desc_in.status.b.bs = 0x3;
-	dma_desc_in.status.b.l = 1;
-	dma_desc_in.status.b.ioc = 1;
-	//dma_desc_in.status.b.sp = 1;
-	dma_desc_in.status.b.sp = 0;
-	dma_desc_in.status.b.sts = 0;
-	dma_desc_in.status.b.bs = 0x0;
-	dma_desc_in.status.b.bytes = len;
-	mmio_write_32(DIEPDMA(ep), (unsigned long)&dma_desc_in);
-
-	data = mmio_read_32(DIEPCTL(ep));
-	data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
-	//data |= DXEPCTL_EPENA | DXEPCTL_CNAK | DXEPCTL_NEXTEP(ep + 1);
-	mmio_write_32(DIEPCTL(ep), data);
-#endif
 }
 
 void dwc2_set_stall(int endpoint, char stall, char in)
@@ -1098,8 +1006,6 @@ void dw_udc_epx_tx(int ep, void *buf, int len)
 	}
 	packets = (len + tx_size - 1) / tx_size;
 
-#ifdef DEBUG_DW_UDC_DMA
-//#if 0
 	/* wait for NAK interrupt */
 	timeout = DW_UDC_TIMEOUT;
 	while (timeout--) {
@@ -1126,51 +1032,6 @@ void dw_udc_epx_tx(int ep, void *buf, int len)
 		mmio_write_32(DIEPTSIZ(ep), len | DXEPTSIZ_PKTCNT(packets));
 		dwc2_start_dma((uintptr_t)buf, 1, ep, len);
 	}
-#else
-	if (len == 0) {
-		/* one empty packet */
-		mmio_write_32(DIEPTSIZ(ep), DXEPTSIZ_PKTCNT(1));
-		dma_desc_in.buf = 0;
-	} else {
-		mmio_write_32(DIEPTSIZ(ep), len | DXEPTSIZ_PKTCNT(packets));
-		dma_desc_in.buf = (unsigned long)buf;
-	}
-	//dma_desc_in.status.b.bs = 0x3;
-	dma_desc_in.status.b.l = 1;
-	dma_desc_in.status.b.ioc = 1;
-	dma_desc_in.status.b.sp = last_one;
-	dma_desc_in.status.b.bytes = len;
-	dma_desc_in.status.b.sts = 0;
-	dma_desc_in.status.b.bs = 0x0;
-	mmio_write_32(DIEPDMA(ep), (unsigned long)&dma_desc_in);
-
-	/* wait for NAK interrupt */
-	timeout = DW_UDC_TIMEOUT;
-	while (timeout--) {
-		data = mmio_read_32(DIEPINT(ep));
-		if (data & DXEPINT_NAKINTRPT)
-			break;
-		udelay(10);
-	}
-	if (timeout == 0) {
-		WARN("DIEPCTL(%d):0x%x, DTXFSTS(%d):0x%x, "
-		     "DIEPINT(%d):0x%x, DIEPTSIZ(%d):0x%x, "
-		     "GINTSTS:0x%x\n",
-		     ep, mmio_read_32(DIEPCTL(ep)),
-		     ep, mmio_read_32(DTXFSTS(ep)),
-		     ep, mmio_read_32(DIEPINT(ep)),
-		     ep, mmio_read_32(DIEPTSIZ(ep)),
-		     mmio_read_32(GINTSTS));
-	}
-	dsb();
-	isb();
-
-	data = mmio_read_32(DIEPCTL(ep));
-	data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
-	mmio_write_32(DIEPCTL(ep), data);
-	dsb();
-	isb();
-#endif
 
 	/* wait for EP transmission completed */
 	timeout = DW_UDC_TIMEOUT;
@@ -1271,10 +1132,8 @@ int dwc2_poll(usb_interrupt_t *usb_intr, size_t *size)
 		}
 
 		if (ints & GINTSTS_OEPINT) {
-			//NOTICE("dwc2 oepint\n");
 			epints = mmio_read_32(DOEPINT(0));
 			if (epints) {
-				NOTICE("#%s, %d, epints:0x%x\n", __func__, __LINE__, epints);
 				if (epints & DXEPINT_AHBERR) {
 					assert(0);
 				}
@@ -1393,9 +1252,7 @@ int dwc2_submit_packet(int ep_idx, uintptr_t buf, size_t size)
 	dw_udc_epx_tx(ep1in.num, tx_req.buf, tx_req.length);
 	return 0;
 #else
-	NOTICE("#%s, %d\n", __func__, __LINE__);
 	ep_send(ep_idx, (void *)buf, size);
-	NOTICE("#%s, %d\n", __func__, __LINE__);
 	return 0;
 #endif
 }

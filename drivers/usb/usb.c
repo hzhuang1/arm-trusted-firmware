@@ -115,7 +115,8 @@ int usb_wait_for_interrupt(uintptr_t buf, usb_interrupt_t *usb_intr,
 	/* poll interrupt in dwc2 layer */
 	assert((usb_intr != NULL) && (size != NULL));
 	result = usb_ops->poll(usb_intr, size);
-	NOTICE("#%s, %d, result:%d, type:%d\n", __func__, __LINE__, result, usb_intr->type);
+	NOTICE("#%s, %d, result:%d, ep:%d, type:%d\n",
+		__func__, __LINE__, result, usb_intr->ep_idx, usb_intr->type);
 	return result;
 }
 
@@ -133,8 +134,6 @@ int usb_enum(void)
 		       (intr.type >= USB_INT_OUT_SETUP) &&
 		       (intr.type < USB_INT_INVALID) &&
 		       (region.size >= size));
-		NOTICE("#%s, %d, interrupt type:%d, ep:%d, size:0x%lx\n",
-			__func__, __LINE__, intr.type, intr.ep_idx, size);
 		switch (intr.type) {
 		case USB_INT_OUT_SETUP:
 			result = usb_handle_setup_packet(region.base, size);
@@ -151,7 +150,6 @@ int usb_enum(void)
 		default:
 			assert(0);
 		}
-		NOTICE("#%s, %d\n", __func__, __LINE__);
 	} while (usb_enum_done == 0);
 	return result;
 }
