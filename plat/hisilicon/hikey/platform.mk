@@ -93,6 +93,8 @@ BL2_SOURCES		+=	drivers/arm/sp804/sp804_delay_timer.c	\
 				drivers/io/io_storage.c			\
 				drivers/emmc/emmc.c			\
 				drivers/synopsys/emmc/dw_mmc.c		\
+				drivers/synopsys/usb/dwc2.c		\
+				drivers/usb/usb.c			\
 				plat/common/aarch64/platform_up_stack.S	\
 				plat/hisilicon/hikey/hikey_bl2_setup.c	\
 				plat/hisilicon/hikey/hikey_io_storage.c

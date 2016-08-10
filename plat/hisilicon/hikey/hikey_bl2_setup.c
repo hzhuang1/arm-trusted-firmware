@@ -34,10 +34,12 @@
 #include <console.h>
 #include <debug.h>
 #include <dw_mmc.h>
+#include <dwc2.h>
 #include <errno.h>
 #include <hi6220.h>
 #include <emmc.h>
 #include <mmio.h>
+#include <fastboot.h>
 #include <platform_def.h>
 #include <sp804_delay_timer.h>
 #include <string.h>
@@ -238,6 +240,7 @@ static void reset_dwmmc_clk(void)
 void bl2_platform_setup(void)
 {
 	dw_mmc_params_t params;
+	fastboot_params_t fb_params;
 
 	sp804_timer_init(SP804_TIMER0_BASE, 10, 192);
 
@@ -251,4 +254,9 @@ void bl2_platform_setup(void)
 	dw_mmc_init(&params);
 
 	hikey_io_setup();
+
+	fb_params.base = HIKEY_MMC_DATA_BASE;
+	fb_params.size = HIKEY_MMC_DATA_SIZE;
+	fb_params.image_id = BL2U_IMAGE_ID;
+	dw_udc_init(&fb_params);
 }
