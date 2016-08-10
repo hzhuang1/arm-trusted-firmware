@@ -56,7 +56,7 @@ struct plat_io_policy {
 	int (*check)(const uintptr_t spec);
 };
 
-static const io_dev_connector_t *emmc_dev_con;
+static const io_dev_connector_t *emmc_dev_con, *emmc_rpmb_dev_con;
 static uintptr_t emmc_dev_handle, emmc_rpmb_dev_handle;
 static const io_dev_connector_t *fip_dev_con;
 static uintptr_t fip_dev_handle;
@@ -81,7 +81,8 @@ static const io_block_spec_t emmc_user_data_spec = {
 
 static const io_block_dev_spec_t emmc_dev_spec = {
 	/* It's used as temp buffer in block driver. */
-#if IMAGE_BL1
+//#if IMAGE_BL1
+#if 0
 	.buffer		= {
 		.offset	= HIKEY_BL1_MMC_DATA_BASE,
 		.length	= HIKEY_BL1_MMC_DATA_SIZE,
@@ -95,6 +96,18 @@ static const io_block_dev_spec_t emmc_dev_spec = {
 	.ops		= {
 		.read	= emmc_read_blocks,
 		.write	= emmc_write_blocks,
+	},
+	.block_size	= EMMC_BLOCK_SIZE,
+};
+
+static const io_block_dev_spec_t emmc_rpmb_dev_spec = {
+	.buffer		= {
+		.offset	= HIKEY_MMC_DATA_BASE,
+		.length	= HIKEY_MMC_DATA_SIZE,
+	},
+	.ops		= {
+		.read	= emmc_rpmb_read_blocks,
+		.write	= emmc_rpmb_write_blocks,
 	},
 	.block_size	= EMMC_BLOCK_SIZE,
 };
@@ -183,11 +196,18 @@ void hikey_io_setup(void)
 	result = register_io_dev_block(&emmc_dev_con);
 	assert(result == 0);
 
+	result = register_io_dev_block(&emmc_rpmb_dev_con);
+	assert(result == 0);
+
 	result = register_io_dev_fip(&fip_dev_con);
 	assert(result == 0);
 
 	result = io_dev_open(emmc_dev_con, (uintptr_t)&emmc_dev_spec,
 			     &emmc_dev_handle);
+	assert(result == 0);
+
+	result = io_dev_open(emmc_rpmb_dev_con, (uintptr_t)&emmc_rpmb_dev_spec,
+			     &emmc_rpmb_dev_handle);
 	assert(result == 0);
 
 	result = io_dev_open(fip_dev_con, (uintptr_t)NULL, &fip_dev_handle);

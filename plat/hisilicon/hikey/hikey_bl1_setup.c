@@ -325,7 +325,7 @@ void bl1_platform_setup(void)
 	hikey_ddr_init();
 
 	params.reg_base = 0xf723d000;
-#if 0
+#if 1
 	params.desc_base = HIKEY_MMC_DESC_BASE;
 #else
 	params.desc_base = HIKEY_BL1_MMC_DESC_BASE;

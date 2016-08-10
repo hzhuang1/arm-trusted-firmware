@@ -76,7 +76,7 @@
 #define HIKEY_FIP_BASE			(MMC_BASE + (4 << 20))
 #define HIKEY_FIP_MAX_SIZE		(8 << 20)
 #define HIKEY_NSBL1U_BASE		(MMC_BASE + 0)
-#define HIKEY_NSBL1U_MAX_SIZE		(32 << 10)
+#define HIKEY_NSBL1U_MAX_SIZE		(128 << 10)
 #define HIKEY_BL2U_BASE			(MMC_BASE + 0)
 #define HIKEY_BL2U_MAX_SIZE		(4 << 30)
 

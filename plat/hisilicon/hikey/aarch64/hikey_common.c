@@ -54,6 +54,13 @@
 					MT_DEVICE | MT_RO | MT_SECURE)
 
 /*
+ * BL2U needs to access the areas of ROM_PARAM, BL1 and BL2U.
+ */
+#define MAP_LOADER	MAP_REGION_FLAT(XG2RAM0_BASE,			\
+					BL2U_BASE - XG2RAM0_BASE,	\
+					MT_DEVICE | MT_RO | MT_SECURE)
+
+/*
  * Table of regions for different BL stages to map using the MMU.
  * This doesn't include Trusted RAM as the 'mem_layout' argument passed to
  * hikey_init_mmu_elx() will give the available subset of that,
@@ -67,7 +74,16 @@ static const mmap_region_t hikey_mmap[] = {
 };
 #endif
 
-#if IMAGE_BL2U || IMAGE_BL2 || IMAGE_BL31
+#if IMAGE_BL2U
+static const mmap_region_t hikey_mmap[] = {
+	MAP_DDR,
+	MAP_DEVICE,
+	MAP_LOADER,
+	{0}
+};
+#endif
+
+#if IMAGE_BL2 || IMAGE_BL31
 static const mmap_region_t hikey_mmap[] = {
 	MAP_DDR,
 	MAP_DEVICE,
