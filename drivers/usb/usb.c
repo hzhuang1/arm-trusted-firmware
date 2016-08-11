@@ -28,6 +28,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <arch_helpers.h>
 #include <assert.h>
 #include <debug.h>
 #include <fastboot.h>
@@ -44,6 +45,48 @@ typedef struct usb_buffer {
 static usb_buffer_t region;
 static const usb_ops_t *usb_ops;
 static int usb_enum_done;
+
+void dump_recv_buf(size_t size)
+{
+	uint32_t base;
+	int i;
+
+	base = region.rx_buf;
+	INFO("dump rx size:%ld, [%x]\n", size, base);
+	for (i = 0; i < size; i += 8) {
+		INFO("[%x %x %x %x %x %x %x %x]\n",
+			mmio_read_8(base + i),
+			mmio_read_8(base + i + 1),
+			mmio_read_8(base + i + 2),
+			mmio_read_8(base + i + 3),
+			mmio_read_8(base + i + 4),
+			mmio_read_8(base + i + 5),
+			mmio_read_8(base + i + 6),
+			mmio_read_8(base + i + 7));
+	}
+	(void)base;
+}
+
+void dump_send_buf(size_t size)
+{
+	uint32_t base;
+	int i;
+
+	base = region.tx_buf;
+	INFO("dump tx size:%ld, [%x]\n", size, base);
+	for (i = 0; i < size; i += 8) {
+		INFO("[%x %x %x %x %x %x %x %x]\n",
+			mmio_read_8(base + i),
+			mmio_read_8(base + i + 1),
+			mmio_read_8(base + i + 2),
+			mmio_read_8(base + i + 3),
+			mmio_read_8(base + i + 4),
+			mmio_read_8(base + i + 5),
+			mmio_read_8(base + i + 6),
+			mmio_read_8(base + i + 7));
+	}
+	(void)base;
+}
 
 int usb_recv_setup(uintptr_t buf, size_t size)
 {
@@ -67,51 +110,54 @@ int usb_setup_response(uintptr_t buf, size_t size)
 int usb_handle_setup_packet(uintptr_t buf)
 {
 	setup_packet *setup;
-	struct usb_device_descriptor *descriptor;
 	size_t size = 0;
 	int result;
+
+	/* debug code */
+	memset((void *)region.tx_size, 0, 0x1000);
+	isb();
+	dsb();
 
 	setup = (setup_packet *)buf;
 	switch (setup->request) {
 	case USB_REQ_GET_STATUS:
-		NOTICE("#get status\n");
+		INFO("#get status\n");
 		break;
 	case USB_REQ_CLEAR_FEATURE:
-		NOTICE("#clear feature\n");
+		INFO("#clear feature\n");
 		size = 0;
 		break;
 	case USB_REQ_SET_FEATURE:
-		NOTICE("#set feature\n");
+		INFO("#set feature\n");
 		break;
 	case USB_REQ_SET_ADDRESS:
-		NOTICE("#set address (%d)\n", setup->value);
+		INFO("#set address (%d)\n", setup->value);
 		result = usb_ops->set_addr(setup->value);
 		assert(result == 0);
 		size = 0;
 		break;
 	case USB_REQ_GET_DESCRIPTOR:
-		NOTICE("#descr, value:0x%x, index:0x%x, length:0x%x\n", setup->value, setup->index, setup->length);
-		size = sizeof(struct usb_device_descriptor);
-		assert(size < region.tx_size);
-		descriptor = (struct usb_device_descriptor *)region.tx_buf;
-		result = usb_ops->get_descriptor(setup, descriptor);
+		result = usb_ops->get_descriptor(setup, region.tx_buf, &size);
+		INFO("for tx, size:0x%lx\n", size);
+		dump_send_buf(size);
+		//INFO("#descr, value:0x%x, index:0x%x, length:0x%x, size:0x%lx\n", setup->value, setup->index, setup->length, size);
+		assert((result == 0) && (size < region.tx_size));
 		//NOTICE("#%s, iSerialNum:%d\n", __func__, descriptor->iSerialNumber);
-		assert(result == 0);
 		break;
 	case USB_REQ_GET_CONFIGURATION:
-		NOTICE("#get configuration\n");
+		INFO("#get configuration\n");
 		break;
 	case USB_REQ_SET_CONFIGURATION:
-		NOTICE("#set configuration\n");
+		INFO("#set configuration\n");
 		break;
 	case USB_REQ_GET_INTERFACE:
-		NOTICE("#get interface\n");
+		INFO("#get interface\n");
 		break;
 	case USB_REQ_SET_INTERFACE:
-		NOTICE("set interface\n");
+		INFO("set interface\n");
 		break;
 	default:
-		NOTICE("not matched. request:0x%x\n", setup->request);
+		INFO("not matched. request:0x%x\n", setup->request);
 		assert(0);
 		break;
 	}
@@ -119,52 +165,13 @@ int usb_handle_setup_packet(uintptr_t buf)
 	if (size == 0)
 		buf = 0;
 	usb_ops->setup_response(region.tx_buf, size);
+	(void)result;
 	return 0;
 }
 
 int usb_handle_data_packet(uintptr_t buf, size_t size)
 {
 	return 0;
-}
-
-void dump_recv_buf(size_t size)
-{
-	uint32_t base;
-	int i;
-
-	base = region.rx_buf;
-	NOTICE("dump rx size:%ld, [%x]\n", size, base);
-	for (i = 0; i < size; i += 8) {
-		NOTICE("[%x %x %x %x %x %x %x %x]\n",
-			mmio_read_8(base + i),
-			mmio_read_8(base + i + 1),
-			mmio_read_8(base + i + 2),
-			mmio_read_8(base + i + 3),
-			mmio_read_8(base + i + 4),
-			mmio_read_8(base + i + 5),
-			mmio_read_8(base + i + 6),
-			mmio_read_8(base + i + 7));
-	}
-}
-
-void dump_send_buf(size_t size)
-{
-	uint32_t base;
-	int i;
-
-	base = region.tx_buf;
-	NOTICE("dump tx size:%ld, [%x]\n", size, base);
-	for (i = 0; i < size; i += 8) {
-		NOTICE("[%x %x %x %x %x %x %x %x]\n",
-			mmio_read_8(base + i),
-			mmio_read_8(base + i + 1),
-			mmio_read_8(base + i + 2),
-			mmio_read_8(base + i + 3),
-			mmio_read_8(base + i + 4),
-			mmio_read_8(base + i + 5),
-			mmio_read_8(base + i + 6),
-			mmio_read_8(base + i + 7));
-	}
 }
 
 /*
@@ -204,7 +211,7 @@ int usb_enum(void)
 		       (region.rx_size >= size));
 		switch (intr.type) {
 		case USB_INT_OUT_SETUP:
-			NOTICE("setup\n");
+			INFO("setup\n");
 			//dump_recv_buf(size);
 			result = usb_handle_setup_packet(region.rx_buf);
 			assert(result == 0);
@@ -212,11 +219,12 @@ int usb_enum(void)
 			assert(result == 0);
 			break;
 		case USB_INT_OUT_DATA:
-			NOTICE("data\n");
+			INFO("data\n");
 			//dump_recv_buf(size);
 			//result = usb_handle_data_packet(buf, *size);
 			break;
 		case USB_INT_IN:
+			dump_send_buf(0x40);
 			//dump_send_buf(size);
 			break;
 		case USB_INT_ENUM_DONE:
@@ -243,7 +251,7 @@ int usb_read(uintptr_t buf, size_t *size)
 	       (usb_interrupt.type < USB_INT_INVALID));
 	switch (usb_interrupt.type) {
 	case USB_INT_OUT_SETUP:
-		NOTICE("#%s, %d, size:%ld\n", __func__, __LINE__, *size);
+		//INFO("#%s, %d, size:%ld\n", __func__, __LINE__, *size);
 		result = usb_handle_setup_packet(buf);
 		/* don't need fastboot protocol to handle it */
 		*size = 0;
@@ -269,10 +277,12 @@ int usb_write(uintptr_t buf, size_t size)
 	return usb_ops->submit_packet(1, buf, size);
 }
 
+#if 0
 static fastboot_ops_t fb_ops = {
 	.read	= usb_read,
 	.write	= usb_write
 };
+#endif
 
 void usb_init(const usb_ops_t *ops_ptr, fastboot_params_t *fb_params)
 {
@@ -291,5 +301,5 @@ void usb_init(const usb_ops_t *ops_ptr, fastboot_params_t *fb_params)
 	region.tx_size = fb_params->size / 2;
 
 	usb_enum();
-	fastboot_init(&fb_ops);
+	//fastboot_init(&fb_ops);
 }

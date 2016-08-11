@@ -94,7 +94,8 @@ struct usb_device_descriptor {
 } __attribute__ ((packed));
 
 typedef struct usb_ops {
-	int	(*get_descriptor)(setup_packet *setup, struct usb_device_descriptor *descriptor);
+	int	(*get_descriptor)(setup_packet *setup, uintptr_t out_buf,
+				  size_t *size);
 	void	(*init)(void);
 	int	(*poll)(usb_interrupt_t *usb_intr, size_t *size);
 	int	(*recv_setup)(uintptr_t buf, size_t size);

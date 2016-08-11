@@ -279,6 +279,7 @@ static int hikey_read_block(unsigned int image_id, size_t offset, size_t size,
 		NOTICE("Failed to load data from 0x%lx\n", offset);
 		goto exit;
 	}
+	(void)block_spec;
 exit:
 	io_close(img_handle);
 	return result;
@@ -326,6 +327,7 @@ static int hikey_write_block(unsigned int image_id, size_t offset, size_t size,
 		NOTICE("Failed to write data into 0x%lx\n", offset);
 		goto exit;
 	}
+	(void)block_spec;
 exit:
 	io_close(img_handle);
 	return result;

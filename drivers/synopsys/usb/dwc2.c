@@ -55,10 +55,12 @@
 
 
 /* software is handling DMA descriptor */
+#define DMAC_DES0_BS_MASK			(3 << 30)
 #define DMAC_DES0_BS_HOST_BUSY			(3 << 30)
 #define DMAC_DES0_BS_DMA_DONE			(2 << 30)
 #define DMAC_DES0_BS_DMA_BUSY			(1 << 30)
 #define DMAC_DES0_BS_HOST_READY			(0 << 30)
+
 /* last descriptor in DMA chain */
 #define DMAC_DES0_LAST				(1 << 27)
 /* inidicates short packet */
@@ -113,10 +115,14 @@ __attribute__ ((section("tzfw_coherent_mem")));
 
 void dwc2_start_dma(uintptr_t buf, int in, int ep, size_t size);
 
+#if 0
 dwc_otg_dev_dma_desc_t dwc2_dma_out_desc
 __attribute__ ((section("tzfw_coherent_mem")));
 dwc_otg_dev_dma_desc_t dwc2_dma_in_desc
 __attribute__ ((section("tzfw_coherent_mem")));
+#else
+//dwc_otg_dev_dma_desc_t dwc2_dma_out_desc, dwc2_dma_in_desc;
+#endif
 
 static struct usb_config_bundle config_bundle
 __attribute__ ((section("tzfw_coherent_mem")));
@@ -217,33 +223,45 @@ static void reset_endpoints(void)
 
 void dwc2_start_dma(uintptr_t buf, int in, int ep, size_t size)
 {
+	dwc_otg_dev_dma_desc_t  *descriptor = NULL;
 	uint32_t data;
 
-	data = DMAC_DES0_LAST | DMAC_DES0_IOC |	/*DMAC_DES0_BS_HOST_BUSY |*/ \
+	data = DMAC_DES0_LAST | DMAC_DES0_IOC |	/*DMAC_DES0_BS_HOST_BUSY | */\
 	       DMAC_DES0_BYTES((uint32_t)size);
 
 	if (in) {
-		//NOTICE("#%s, in buf:0x%lx, size:0x%lx\n", __func__, buf, size);
-		if (size)
-			clean_dcache_range(buf, size);
 		data |= DMAC_DES0_SP;
-		memcpy(&dwc2_dma_in_desc.status, &data, sizeof(uint32_t));
-		dwc2_dma_in_desc.buf = (uint32_t)buf;
-		clean_dcache_range((uintptr_t)&dwc2_dma_in_desc, 64);
-		mmio_write_32(DIEPDMA(ep), (uint32_t)((uintptr_t)&dwc2_dma_in_desc));
-		data = mmio_read_32(DIEPCTL(ep));
-		data |= DXEPCTL_EPENA | DXEPCTL_CNAK | DXEPCTL_USBACTEP;
+		descriptor = (dwc_otg_dev_dma_desc_t *)HIKEY_USB_DESC_IN_BASE;
+		descriptor->status.d32 = data;
+		if (size) {
+			descriptor->buf = (uint32_t)buf;
+		} else {
+			descriptor->buf = 0;
+		}
+		isb();
+		dsb();
+
+		mmio_write_32(DIEPDMA(ep), (uint32_t)((uintptr_t)descriptor));
+		//INFO("#%s, GINTSTS:0x%x, DIEPINT0:0x%x\n", __func__, mmio_read_32(GINTSTS), mmio_read_32(DIEPINT(0)));
+		//data = mmio_read_32(DIEPCTL(ep));
+		data = DXEPCTL_EPENA | DXEPCTL_CNAK;
+//		data &= ~DXEPCTL_STALL;
 		mmio_write_32(DIEPCTL(ep), data);
 	} else {
-		//NOTICE("#%s, out buf:0x%lx, size:0x%lx\n", __func__, buf, size);
-		if (size)
-			inv_dcache_range(buf, size);
-		memcpy(&dwc2_dma_out_desc.status, &data, sizeof(uint32_t));
-		dwc2_dma_out_desc.buf = (uint32_t)buf;
-		clean_dcache_range((uintptr_t)&dwc2_dma_out_desc, 64);
-		mmio_write_32(DOEPDMA(ep), (uint32_t)((uintptr_t)&dwc2_dma_out_desc));
-		data = mmio_read_32(DOEPCTL(ep));
-		data |= DXEPCTL_EPENA | DXEPCTL_CNAK | DXEPCTL_USBACTEP;
+		descriptor = (dwc_otg_dev_dma_desc_t *)HIKEY_USB_DESC_OUT_BASE;
+		descriptor->status.d32 = data;
+		if (size) {
+			memset((void *)buf, 0, 0x1000);
+			descriptor->buf = (uint32_t)buf;
+		} else {
+			descriptor->buf = 0;
+		}
+		isb();
+		dsb();
+
+		mmio_write_32(DOEPDMA(ep), (uint32_t)((uintptr_t)descriptor));
+		//data = mmio_read_32(DOEPCTL(ep));
+		data = DXEPCTL_EPENA | DXEPCTL_CNAK;
 		mmio_write_32(DOEPCTL(ep), data);
 	}
 }
@@ -372,11 +390,11 @@ void usb_config(void)
 	/* Soft Reconnect */
 	mmio_write_32(DCTL, 0x800);
 
-#if 0
+#if 1
 	data = DOEPTSIZ0_SUPCNT(1) | DOEPTSIZ0_PKTCNT |
 		(8 << DOEPTSIZ0_XFERSIZE_SHIFT);
 #else
-	data = DOEPTSIZ0_SUPCNT(1) | DOEPTSIZ0_PKTCNT |
+	data = DOEPTSIZ0_SUPCNT(3) | DOEPTSIZ0_PKTCNT |
 		(32 << DOEPTSIZ0_XFERSIZE_SHIFT);
 #endif
 	mmio_write_32(DOEPTSIZ0, data);
@@ -413,17 +431,23 @@ static void ep_send(int ep, const void *ptr, int len)
 	packets = (len + tx_size - 1) / tx_size;
 
 	/* EPx OUT ACTIVE */
-	data = mmio_read_32(DIEPCTL(ep)) | DXEPCTL_USBACTEP;
+	data = mmio_read_32(DIEPCTL(ep)) | DXEPCTL_USBACTEP | DXEPCTL_SNAK;
 	mmio_write_32(DIEPCTL(ep), data);
 
 	// EPx IN
 	if (!len) {
 		mmio_write_32(DIEPTSIZ(ep), DXEPTSIZ_PKTCNT(1));
+		isb();
+		dsb();
 		dwc2_start_dma(0, 1, ep, 0);
 	} else {
 		mmio_write_32(DIEPTSIZ(ep), len | DXEPTSIZ_PKTCNT(packets));
+		isb();
+		dsb();
 		dwc2_start_dma((uintptr_t)ptr, 1, ep, len);
 	}
+	isb();
+	dsb();
 }
 
 int usb_drv_send_nonblocking(int endpoint, const void *ptr, int len)
@@ -1072,15 +1096,16 @@ int dwc2_poll(usb_interrupt_t *usb_intr, size_t *size)
 {
 	uint32_t ints, epints, data;
 	int timeout = DW_UDC_TIMEOUT;
+	dwc_otg_dev_dma_desc_t  *desc = NULL;
 
 	assert((usb_intr != NULL) && (size != NULL));
+	//INFO("+");
 	//for (timeout = DW_UDC_TIMEOUT; timeout > 0; timeout--) {
 	for (;;) {
 		ints = mmio_read_32(GINTSTS);
-		mmio_write_32(GINTSTS, ints);
 
 		if (ints & GINTSTS_USBRST) {
-			NOTICE("dwc2 reset\n");
+			INFO("dwc2 reset\n");
 			usb_intr->type = USB_INT_RESET;
 			*size = 0;
 			break;
@@ -1089,7 +1114,7 @@ int dwc2_poll(usb_interrupt_t *usb_intr, size_t *size)
 		if (ints & GINTSTS_ENUMDONE) {
 			uint32_t max_packet_size;
 
-			NOTICE("dwc2 enum done\n");
+			INFO("dwc2 enum done\n");
 			if (usb_drv_port_speed())
 				max_packet_size = USB_BLOCK_HIGH_SPEED_SIZE;
 			else
@@ -1107,6 +1132,8 @@ int dwc2_poll(usb_interrupt_t *usb_intr, size_t *size)
 		if (ints & GINTSTS_OEPINT) {
 			epints = mmio_read_32(DOEPINT(0));
 			if (epints) {
+				INFO("O\n");
+		//NOTICE("#%s, GINTSTS:0x%x, DOEPINT0:0x%x\n", __func__, mmio_read_32(GINTSTS), mmio_read_32(DOEPINT(0)));
 				if (epints & DXEPINT_AHBERR) {
 					assert(0);
 				}
@@ -1137,15 +1164,34 @@ int dwc2_poll(usb_interrupt_t *usb_intr, size_t *size)
 				NOTICE("#%s, out, status:0x%x\n", __func__, dwc2_dma_out_desc.status.d32);
 #else
 				if (epints & DXEPINT_XFERCOMPL) {
+					INFO("x");
 					data = mmio_read_32(DOEPTSIZ(0));
-					NOTICE("OE0 Rx:0x%x, 0x%x\n", data, DXEPTSIZ_XFERSIZE_GET(data));
+					if (data) {
+					}
+					//INFO("OE0 Rx:0x%x, 0x%x\n", data, DXEPTSIZ_XFERSIZE_GET(data));
 					*size = DXEPTSIZ_XFERSIZE_GET(data);
 					usb_intr->type = USB_INT_OUT_DATA;
 					usb_intr->ep_idx = 0;
 					//NOTICE("#%s, %d, bs:%d\n", __func__, __LINE__, dwc2_dma_out_desc.status.b.bs);
 					/* wait for DMA finished */
-					while (dwc2_dma_out_desc.status.b.bs != 2) {}
-					if (dwc2_dma_out_desc.status.b.sr) {
+					desc = (dwc_otg_dev_dma_desc_t *)HIKEY_USB_DESC_OUT_BASE;
+					INFO("desc [0x%x-0x%x]\n",
+						mmio_read_32(HIKEY_USB_DESC_OUT_BASE),
+						mmio_read_32(HIKEY_USB_DESC_OUT_BASE + 4));
+					INFO("data [0x%x, 0x%x, 0x%x, 0x%x\n",
+						mmio_read_32(HIKEY_MMC_DATA_BASE),
+						mmio_read_32(HIKEY_MMC_DATA_BASE + 4),
+						mmio_read_32(HIKEY_MMC_DATA_BASE + 8),
+						mmio_read_32(HIKEY_MMC_DATA_BASE + 12));
+#if 0
+					do {
+						data = mmio_read_32(HIKEY_USB_DESC_OUT_BASE);
+						INFO("0x%x, 0x%x, 0x%x\n", data, data & DMAC_DES0_BS_MASK, DMAC_DES0_BS_DMA_DONE);
+					} while ((data & DMAC_DES0_BS_MASK) != DMAC_DES0_BS_DMA_DONE);
+					//while (desc->status.b.bs != 2) { INFO(":%d:", desc->status.b.bs);}
+#endif
+					if (desc->status.b.sr) {
+						INFO("p\n");
 						usb_intr->type = USB_INT_OUT_SETUP;
 						/* Stall this end point */
 						data = mmio_read_32(DOEPCTL(0));
@@ -1166,24 +1212,31 @@ int dwc2_poll(usb_interrupt_t *usb_intr, size_t *size)
 				epints = mmio_read_32(DOEPINT(0));
 				mmio_write_32(DOEPINT(0), epints);
 			}
+
+			epints = mmio_read_32(DOEPINT(1));
+			if (epints)
+				assert(0);
 			break;
 		}
 
 		if (ints & GINTSTS_IEPINT) {
 			epints = mmio_read_32(DIEPINT(0));
+		//NOTICE("#%s, GINTSTS:0x%x, DIEPINT0:0x%x, DIEPCTL0:0x%x\n", __func__, mmio_read_32(GINTSTS), mmio_read_32(DIEPINT(0)), mmio_read_32(DIEPCTL(0)));
 			if (epints) {
+				INFO("I\n");
 				if (epints & DXEPINT_AHBERR) {
 					assert(0);
 				}
 				if (epints & DXEPINT_XFERCOMPL) {
+					desc = (dwc_otg_dev_dma_desc_t *)HIKEY_USB_DESC_IN_BASE;
 					data = mmio_read_32(DIEPTSIZ(0));
 					//NOTICE("IE0 Tx:0x%x, 0x%x\n", data, DXEPTSIZ_XFERSIZE_GET(data));
 					usb_intr->type = USB_INT_IN;
 					usb_intr->ep_idx = 0;
 					*size = DXEPTSIZ_XFERSIZE_GET(data);
 					/* check dma status */
-					while (dwc2_dma_in_desc.status.b.bs != 2) {}
-					//NOTICE("##%s, remained tx bytes:%d\n", __func__, dwc2_dma_in_desc.status.b.bytes);
+					//while (desc->status.b.bs != 2) { INFO(":%d:", desc->status.b.bs);}
+					//INFO("##%s, in dma status:0x%x\n", __func__, dwc2_dma_in_desc.status.d32);
 				}
 				//NOTICE("#%s, in, status:0x%x\n", __func__, dwc2_dma_in_desc.status.d32);
 				mmio_write_32(DIEPINT(0), epints);
@@ -1194,6 +1247,9 @@ int dwc2_poll(usb_interrupt_t *usb_intr, size_t *size)
 
 //		udelay(10);
 	}
+	INFO("-\n");
+	/* only clear GINTSTS after all endpoints interrupt handled */
+	mmio_write_32(GINTSTS, ints);
 	if (timeout == 0) {
 		NOTICE("#%s, %d, timeout, GINTSTS:0x%x\n", __func__, __LINE__, mmio_read_32(GINTSTS));
 		return -ETIMEDOUT;
@@ -1212,36 +1268,104 @@ int dwc2_set_addr(int addr)
 	return 0;
 }
 
-static int dwc2_get_descriptor(setup_packet *setup,
-			       struct usb_device_descriptor *descriptor)
+static int dwc2_get_descriptor(setup_packet *setup, uintptr_t out_buf,
+			       size_t *size)
 {
-	uint32_t data;
+	uint32_t type;
+	struct usb_device_descriptor *device_desc;
+	struct usb_config_descriptor *config_desc;
+	struct usb_interface_descriptor *intf_desc;
+	struct usb_endpoint_descriptor *ep0_desc, *ep1_desc;
+	uintptr_t buf;
 
-	assert((setup != NULL) && (descriptor != NULL));
-	data = setup->value >> 8;
-	switch (data) {
+	assert((setup != NULL) && (out_buf != 0) && (size != NULL));
+	type = setup->value >> 8;
+	switch (type) {
 	case USB_DT_DEVICE:
-		NOTICE("d\n");
-		//NOTICE("get dt device\n");
-		descriptor->bLength = sizeof(struct usb_device_descriptor);
-		descriptor->bDescriptorType = USB_DT_DEVICE;
-		descriptor->bcdUSB = 0x0200;		/* USB 2.0 */
-		descriptor->bDeviceClass = 0;
-		descriptor->bDeviceProtocol = 0;
-		descriptor->bMaxPacketSize0 = 64;
-		descriptor->idVendor = 0x18d1;
-		descriptor->idProduct = 0xd00d;
-		descriptor->bcdDevice = 0x0100;
-		descriptor->iManufacturer = 1;
-		descriptor->iProduct = 2;
-		descriptor->iSerialNumber = 3;
-		descriptor->bNumConfigurations = 1;
-		break;
-	case USB_DT_OTHER_SPEED_CONFIG:
-		NOTICE("get dt other speed config\n");
+		device_desc = (struct usb_device_descriptor *)out_buf;
+		device_desc->bLength = sizeof(struct usb_device_descriptor);
+		device_desc->bDescriptorType = USB_DT_DEVICE;
+		device_desc->bcdUSB = 0x0200;		/* USB 2.0 */
+		device_desc->bDeviceClass = 0;
+		device_desc->bDeviceSubClass = 0;
+		device_desc->bDeviceProtocol = 0;
+		device_desc->bMaxPacketSize0 = 64;
+		device_desc->idVendor = 0x18d1;
+		device_desc->idProduct = 0xd00d;
+		device_desc->bcdDevice = 0x0100;
+		device_desc->iManufacturer = 1;
+		device_desc->iProduct = 2;
+		device_desc->iSerialNumber = 3;
+		device_desc->bNumConfigurations = 1;
+		*size = device_desc->bLength;
 		break;
 	case USB_DT_CONFIG:
-		NOTICE("##get dt config\n");
+	case USB_DT_OTHER_SPEED_CONFIG:
+		/* 1 config, 1 interface, 2 ep */
+		buf = out_buf;
+		*size = sizeof(struct usb_config_descriptor) +	\
+			sizeof(struct usb_interface_descriptor) +	\
+			sizeof(struct usb_endpoint_descriptor) * 2;
+		INFO("#1\n");
+		memset((void *)buf, 0, *size);
+		isb();
+		dsb();
+		INFO("#2\n");
+		config_desc = (struct usb_config_descriptor *)buf;
+		config_desc->wTotalLength = *size;
+		config_desc->bLength = sizeof(struct usb_config_descriptor);
+		if (type == USB_DT_CONFIG) {
+			INFO("##get dt config\n");
+			config_desc->bDescriptorType = USB_DT_CONFIG;
+		} else {
+			INFO("##get dt other speed config\n");
+			config_desc->bDescriptorType = USB_DT_OTHER_SPEED_CONFIG;
+		}
+		config_desc->bNumInterfaces = 1;
+		config_desc->bConfigurationValue = 1;
+		config_desc->iConfiguration = 0;
+		config_desc->bmAttributes = USB_CONFIG_ATT_ONE;
+		config_desc->bMaxPower = 0x80;
+		buf += config_desc->bLength;
+
+		intf_desc = (struct usb_interface_descriptor *)buf;
+		intf_desc->bLength = sizeof(struct usb_interface_descriptor);
+		intf_desc->bDescriptorType = USB_DT_INTERFACE;
+		intf_desc->bInterfaceNumber = 0;
+		intf_desc->bAlternateSetting = 0;
+		intf_desc->bNumEndpoints = 2;
+		intf_desc->bInterfaceClass = USB_CLASS_VENDOR_SPEC;
+		intf_desc->bInterfaceSubClass = 0x42;
+		intf_desc->bInterfaceProtocol = 0x03;
+		intf_desc->iInterface = 0;
+		buf += intf_desc->bLength;
+
+		ep0_desc = (struct usb_endpoint_descriptor *)buf;
+		ep0_desc->bLength = sizeof(struct usb_endpoint_descriptor);
+		ep0_desc->bDescriptorType = USB_DT_ENDPOINT;
+		ep0_desc->bEndpointAddress = 0x81;
+		ep0_desc->bmAttributes = USB_ENDPOINT_XFER_BULK;
+		ep0_desc->bInterval = 0;
+		buf += sizeof(struct usb_endpoint_descriptor);
+
+		ep1_desc = (struct usb_endpoint_descriptor *)buf;
+		ep1_desc->bLength = sizeof(struct usb_endpoint_descriptor);
+		ep1_desc->bDescriptorType = USB_DT_ENDPOINT;
+		ep1_desc->bEndpointAddress = 0x1;
+		ep1_desc->bmAttributes = USB_ENDPOINT_XFER_BULK;
+		ep1_desc->bInterval = 0;
+		if (usb_drv_port_speed()) {
+			ep0_desc->wMaxPacketSize = USB_BLOCK_HIGH_SPEED_SIZE;
+			ep1_desc->wMaxPacketSize = USB_BLOCK_HIGH_SPEED_SIZE;
+		} else {
+			ep0_desc->wMaxPacketSize = 64;
+			ep1_desc->wMaxPacketSize = 64;
+		}
+
+		/*
+		buf += sizeof(struct usb_endpoint_descriptor);
+		*size = config_desc->wTotalLength;
+		*/
 		break;
 	case USB_DT_STRING:
 		NOTICE("get dt string\n");
@@ -1255,15 +1379,39 @@ static int dwc2_get_descriptor(setup_packet *setup,
 
 int dwc2_recv_setup(uintptr_t buf, size_t size)
 {
+	uint32_t data;
+
+	data = DOEPTSIZ0_SUPCNT(1) | DOEPTSIZ0_PKTCNT |
+	       (8 << DOEPTSIZ0_XFERSIZE_SHIFT);
+	mmio_write_32(DOEPTSIZ(0), data);
+
+#if 0
+	data = mmio_read_32(DOEPCTL(0));
+	data |= DXEPCTL_STALL;
+	mmio_write_32(DOEPCTL(0), data);
+	data = mmio_read_32(DIEPCTL(0));
+	data |= DXEPCTL_STALL;
+	mmio_write_32(DIEPCTL(0), data);
+#endif
+
 	dwc2_start_dma(buf, 0, 0, size);
 	return 0;
 }
 
 int dwc2_setup_response(uintptr_t buf, size_t size)
 {
-	if (size)
+	uint32_t data;
+	//INFO("#%s, size:0x%lx\n", __func__, size);
+	if (size) {
+		/* clear STALL */
+		data = mmio_read_32(DIEPCTL(0));
+		data &= ~DXEPCTL_STALL;
+		mmio_write_32(DIEPCTL(0), data);
+		data = mmio_read_32(DOEPCTL(0));
+		data &= ~DXEPCTL_STALL;
+		mmio_write_32(DOEPCTL(0), data);
 		ep_send(0, (void *)buf, size);
-	else
+	} else
 		ep_send(0, NULL, size);
 	return 0;
 }

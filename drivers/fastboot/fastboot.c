@@ -278,6 +278,7 @@ static void cmd_download(fastboot_handle_t *handle, char *arg)
 		fastboot_okay(handle, NULL);
 #endif
 	}
+	(void)result;
 }
 
 static void cmd_erase(fastboot_handle_t *handle, char *arg)

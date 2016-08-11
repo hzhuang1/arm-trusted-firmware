@@ -835,7 +835,7 @@ typedef struct dwc_otg_dev_dma_desc {
 	dev_dma_desc_sts_t status;
 	/** DMA Descriptor data buffer pointer */
 	unsigned int buf;
-} dwc_otg_dev_dma_desc_t;
+} __aligned(64) dwc_otg_dev_dma_desc_t;
 
 extern void usb_reinit(void);
 #define DW_UDC_RX_MAX_PACKETS			0x3ff

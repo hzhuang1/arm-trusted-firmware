@@ -301,6 +301,7 @@ int hikey_oem(const char *arg)
 	} else {
 		assert(0);
 	}
+	(void)result;
 	return 0;
 }
 
