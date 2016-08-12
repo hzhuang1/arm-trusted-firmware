@@ -250,7 +250,7 @@ void bl2_platform_setup(void)
 	params.desc_size = 1 << 20;
 	params.clk_rate = 24 * 1000 * 1000;
 	params.bus_width = EMMC_BUS_WIDTH_8;
-	params.cmd23 = 1;
+	params.flags = EMMC_FLAG_CMD23;
 	dw_mmc_init(&params);
 
 	hikey_io_setup();

@@ -303,7 +303,7 @@ void bl2u_platform_setup(void)
 	dw_params.desc_size = 1 << 20;
 	dw_params.clk_rate = 24 * 1000 * 1000;
 	dw_params.bus_width = EMMC_BUS_WIDTH_8;
-	dw_params.cmd23 = 1;
+	dw_params.flags = EMMC_FLAG_CMD23;
 	dw_mmc_init(&dw_params);
 	hikey_io_setup();
 	partition_ops.handler = hikey_partition_table_handler;
