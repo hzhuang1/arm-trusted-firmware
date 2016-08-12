@@ -40,7 +40,12 @@
 static const emmc_ops_t *ops;
 static unsigned int emmc_ocr_value;
 static emmc_csd_t emmc_csd;
-static int emmc_cmd23;
+static unsigned int emmc_flags;
+
+static int is_cmd23_enabled(void)
+{
+	return (!!(emmc_flags & EMMC_FLAG_CMD23));
+}
 
 static int emmc_device_state(void)
 {
@@ -175,7 +180,7 @@ size_t emmc_read_blocks(int lba, uintptr_t buf, size_t size)
 	ret = ops->prepare(lba, buf, size);
 	assert(ret == 0);
 
-	if (emmc_cmd23) {
+	if (is_cmd23_enabled()) {
 		memset(&cmd, 0, sizeof(emmc_cmd_t));
 		/* set block count */
 		cmd.cmd_idx = EMMC_CMD23;
@@ -206,7 +211,7 @@ size_t emmc_read_blocks(int lba, uintptr_t buf, size_t size)
 	/* wait buffer empty */
 	emmc_device_state();
 
-	if (emmc_cmd23 == 0) {
+	if (is_cmd23_enabled() == 0) {
 		if (size > EMMC_BLOCK_SIZE) {
 			memset(&cmd, 0, sizeof(emmc_cmd_t));
 			cmd.cmd_idx = EMMC_CMD12;
@@ -233,7 +238,7 @@ size_t emmc_write_blocks(int lba, const uintptr_t buf, size_t size)
 	ret = ops->prepare(lba, buf, size);
 	assert(ret == 0);
 
-	if (emmc_cmd23) {
+	if (is_cmd23_enabled()) {
 		/* set block count */
 		memset(&cmd, 0, sizeof(emmc_cmd_t));
 		cmd.cmd_idx = EMMC_CMD23;
@@ -265,7 +270,7 @@ size_t emmc_write_blocks(int lba, const uintptr_t buf, size_t size)
 	/* wait buffer empty */
 	emmc_device_state();
 
-	if (emmc_cmd23 == 0) {
+	if (is_cmd23_enabled() == 0) {
 		if (size > EMMC_BLOCK_SIZE) {
 			memset(&cmd, 0, sizeof(emmc_cmd_t));
 			cmd.cmd_idx = EMMC_CMD12;
@@ -358,7 +363,8 @@ size_t emmc_rpmb_erase_blocks(int lba, size_t size)
 	return size_erased;
 }
 
-void emmc_init(const emmc_ops_t *ops_ptr, int clk, int width, int cmd23)
+void emmc_init(const emmc_ops_t *ops_ptr, int clk, int width,
+	       unsigned int flags)
 {
 	assert((ops_ptr != 0) &&
 	       (ops_ptr->init != 0) &&
@@ -372,7 +378,7 @@ void emmc_init(const emmc_ops_t *ops_ptr, int clk, int width, int cmd23)
 		(width == EMMC_BUS_WIDTH_4) ||
 		(width == EMMC_BUS_WIDTH_8)));
 	ops = ops_ptr;
-	emmc_cmd23 = cmd23;
+	emmc_flags = flags;
 
 	emmc_enumerate(clk, width);
 }
