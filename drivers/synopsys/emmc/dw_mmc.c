@@ -419,5 +419,5 @@ void dw_mmc_init(dw_mmc_params_t *params)
 
 	memcpy(&dw_params, params, sizeof(dw_mmc_params_t));
 	emmc_init(&dw_mmc_ops, params->clk_rate, params->bus_width,
-		  params->cmd23);
+		  params->flags);
 }
