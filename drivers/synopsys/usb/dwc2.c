@@ -244,7 +244,8 @@ void dwc2_start_dma(uintptr_t buf, int in, int ep, size_t size)
 		mmio_write_32(DIEPDMA(ep), (uint32_t)((uintptr_t)descriptor));
 		//INFO("#%s, GINTSTS:0x%x, DIEPINT0:0x%x\n", __func__, mmio_read_32(GINTSTS), mmio_read_32(DIEPINT(0)));
 		//data = mmio_read_32(DIEPCTL(ep));
-		data = DXEPCTL_EPENA | DXEPCTL_CNAK;
+		data = mmio_read_32(DIEPCTL(ep));
+		data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
 //		data &= ~DXEPCTL_STALL;
 		mmio_write_32(DIEPCTL(ep), data);
 	} else {
@@ -260,8 +261,8 @@ void dwc2_start_dma(uintptr_t buf, int in, int ep, size_t size)
 		dsb();
 
 		mmio_write_32(DOEPDMA(ep), (uint32_t)((uintptr_t)descriptor));
-		//data = mmio_read_32(DOEPCTL(ep));
-		data = DXEPCTL_EPENA | DXEPCTL_CNAK;
+		data = mmio_read_32(DOEPCTL(ep));
+		data |= DXEPCTL_EPENA | DXEPCTL_CNAK;
 		mmio_write_32(DOEPCTL(ep), data);
 	}
 }
