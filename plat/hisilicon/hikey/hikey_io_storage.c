@@ -32,6 +32,7 @@
 #include <assert.h>
 #include <debug.h>
 #include <emmc.h>
+#include <errno.h>
 #include <firmware_image_package.h>
 #include <io_block.h>
 #include <io_driver.h>
@@ -43,6 +44,11 @@
 #include <semihosting.h>	/* For FOPEN_MODE_... */
 #include <string.h>
 #include "hikey_private.h"
+
+#define EMMC_BLOCK_SHIFT			9
+
+/* Page 1024, since only a few pages before 2048 are used as partition table */
+#define SERIALNO_EMMC_OFFSET			(1024 * 512)
 
 struct plat_io_policy {
 	uintptr_t *dev_handle;
@@ -68,12 +74,24 @@ static const io_block_spec_t emmc_rpmb_spec = {
 	.length		= HIKEY_NSBL1U_MAX_SIZE,
 };
 
+static const io_block_spec_t emmc_user_data_spec = {
+	.offset		= HIKEY_BL2U_BASE,
+	.length		= HIKEY_BL2U_MAX_SIZE - EMMC_BLOCK_SIZE,
+};
+
 static const io_block_dev_spec_t emmc_dev_spec = {
 	/* It's used as temp buffer in block driver. */
+#if IMAGE_BL1
+	.buffer		= {
+		.offset	= HIKEY_BL1_MMC_DATA_BASE,
+		.length	= HIKEY_BL1_MMC_DATA_SIZE,
+	},
+#else
 	.buffer		= {
 		.offset	= HIKEY_MMC_DATA_BASE,
 		.length	= HIKEY_MMC_DATA_SIZE,
 	},
+#endif
 	.ops		= {
 		.read	= emmc_read_blocks,
 		.write	= emmc_write_blocks,
@@ -117,6 +135,11 @@ static const struct plat_io_policy policies[] = {
 	[NS_BL1U_IMAGE_ID] = {
 		&emmc_rpmb_dev_handle,
 		(uintptr_t)&emmc_rpmb_spec,
+		check_emmc
+	},
+	[BL2U_IMAGE_ID] = {
+		&emmc_dev_handle,
+		(uintptr_t)&emmc_user_data_spec,
 		check_emmc
 	}
 };
@@ -192,5 +215,127 @@ int plat_get_image_source(unsigned int image_id, uintptr_t *dev_handle,
 	*image_spec = policy->image_spec;
 	*dev_handle = *(policy->dev_handle);
 
+	return result;
+}
+
+static int hikey_read_block(unsigned int image_id, size_t offset, size_t size,
+			    uintptr_t buffer)
+{
+	uintptr_t *dev_handle;
+	uintptr_t img_handle, spec = 0;
+	size_t bytes_read;
+	io_block_spec_t *block_spec;
+	int result;
+
+	assert((image_id == BL2U_IMAGE_ID) || (image_id == NS_BL1U_IMAGE_ID));
+
+	dev_handle = policies[image_id].dev_handle;
+	assert((dev_handle == &emmc_dev_handle) ||
+	       (dev_handle == &emmc_rpmb_dev_handle));
+	result = plat_get_image_source(image_id, dev_handle, &spec);
+	if (result) {
+		WARN("Failed to get emmc area\n");
+		return -ENODEV;
+	}
+
+	block_spec = (io_block_spec_t *)spec;
+	/* Check whether address is in valid range. */
+	assert((offset >= block_spec->offset) &&
+	       (offset < block_spec->offset + block_spec->length) &&
+	       (size <= block_spec->length) &&
+	       (offset + size <= block_spec->offset + block_spec->length));
+	result = io_open(*dev_handle, spec, &img_handle);
+	if (result != 0) {
+		WARN("Failed to open memmap device\n");
+		return -ENODEV;
+	}
+	result = io_seek(img_handle, IO_SEEK_SET, offset);
+	if (result) {
+		WARN("Failed to seek at offset 0x%lx\n", offset);
+		goto exit;
+	}
+	result = io_read(img_handle, buffer, size, &bytes_read);
+	if ((result != 0) || (bytes_read < size)) {
+		NOTICE("Failed to load data from 0x%lx\n", offset);
+		goto exit;
+	}
+exit:
+	io_close(img_handle);
+	return result;
+}
+
+static int hikey_write_block(unsigned int image_id, size_t offset, size_t size,
+			     uintptr_t buffer)
+{
+	uintptr_t *dev_handle;
+	uintptr_t img_handle, spec = 0;
+	size_t bytes_written;
+	io_block_spec_t *block_spec;
+	int result;
+
+	assert((image_id == BL2U_IMAGE_ID) || (image_id == NS_BL1U_IMAGE_ID));
+
+	dev_handle = policies[image_id].dev_handle;
+	assert((dev_handle == &emmc_dev_handle) ||
+	       (dev_handle == &emmc_rpmb_dev_handle));
+	result = plat_get_image_source(image_id, dev_handle, &spec);
+	if (result) {
+		WARN("Failed to get emmc area\n");
+		return -ENODEV;
+	}
+	(void)spec;
+
+	block_spec = (io_block_spec_t *)spec;
+	/* Check whether address is in valid range. */
+	assert((offset >= block_spec->offset) &&
+	       (offset < block_spec->offset + block_spec->length) &&
+	       (size <= block_spec->length) &&
+	       (offset + size <= block_spec->offset + block_spec->length));
+	result = io_open(*dev_handle, spec, &img_handle);
+	if (result != 0) {
+		WARN("Failed to open memmap device\n");
+		return -ENODEV;
+	}
+	result = io_seek(img_handle, IO_SEEK_SET, offset);
+	if (result) {
+		WARN("Failed to seek at offset 0x%lx\n", offset);
+		goto exit;
+	}
+	result = io_write(img_handle, buffer, size, &bytes_written);
+	if ((result != 0) || (bytes_written < size)) {
+		NOTICE("Failed to write data into 0x%lx\n", offset);
+		goto exit;
+	}
+exit:
+	io_close(img_handle);
+	return result;
+}
+
+int hikey_read_serialno(struct random_serial_num *serialno)
+{
+	int result;
+
+	assert(serialno != NULL);
+	result = hikey_read_block(BL2U_IMAGE_ID, SERIALNO_EMMC_OFFSET,
+				  sizeof(struct random_serial_num),
+				  (uintptr_t)serialno);
+	assert(result == 0);
+	/* Reference result. */
+	(void)result;
+
+	if (serialno->magic != RANDOM_MAGIC)
+		return -ENOENT;
+	return 0;
+}
+
+int hikey_write_serialno(struct random_serial_num *serialno)
+{
+	int result;
+
+	assert((serialno != NULL) && (serialno->magic == RANDOM_MAGIC));
+	result = hikey_write_block(BL2U_IMAGE_ID, SERIALNO_EMMC_OFFSET,
+				   sizeof(struct random_serial_num),
+				   (uintptr_t)serialno);
+	assert(result == 0);
 	return result;
 }

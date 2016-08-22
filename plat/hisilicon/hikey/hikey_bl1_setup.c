@@ -324,11 +324,17 @@ void bl1_platform_setup(void)
 
 	hikey_ddr_init();
 
+	memset(&params, 0, sizeof(dw_mmc_params_t));
 	params.reg_base = 0xf723d000;
+#if 0
 	params.desc_base = HIKEY_MMC_DESC_BASE;
+#else
+	params.desc_base = HIKEY_BL1_MMC_DESC_BASE;
+#endif
 	params.desc_size = 1 << 20;
 	params.clk_rate = 24 * 1000 * 1000;
 	params.bus_width = EMMC_BUS_WIDTH_8;
+	params.flags = EMMC_FLAG_CMD23;
 	dw_mmc_init(&params);
 
 	hikey_io_setup();
@@ -340,7 +346,7 @@ void bl1_platform_setup(void)
  */
 unsigned int bl1_plat_get_next_image_id(void)
 {
-#if 0
+#if 1
 	int32_t boot_mode;
 	unsigned int ret;
 

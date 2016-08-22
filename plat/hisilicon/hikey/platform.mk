@@ -29,14 +29,16 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-CONSOLE_BASE		:=	PL011_UART3_BASE
-CRASH_CONSOLE_BASE	:=	PL011_UART3_BASE
-PLAT_PL061_MAX_GPIOS	:=	160
+CONSOLE_BASE			:=	PL011_UART3_BASE
+CRASH_CONSOLE_BASE		:=	PL011_UART3_BASE
+PLAT_PARTITION_MAX_ENTRIES	:=	128
+PLAT_PL061_MAX_GPIOS		:=	160
 
 # Process flags
 $(eval $(call add_define,CONSOLE_BASE))
 $(eval $(call add_define,CRASH_CONSOLE_BASE))
 $(eval $(call add_define,PLAT_PL061_MAX_GPIOS))
+$(eval $(call add_define,PLAT_PARTITION_MAX_ENTRIES))
 
 ENABLE_PLAT_COMPAT	:=	0
 
@@ -68,14 +70,24 @@ BL1_SOURCES		+=	bl1/tbbr/tbbr_img_desc.c		\
 				plat/hisilicon/hikey/hikey_bl1_setup.c	\
 				plat/hisilicon/hikey/hikey_io_storage.c
 
-BL2U_SOURCES		+=	drivers/io/io_block.c			\
+BL2U_SOURCES		+=	drivers/arm/pl061/pl061_gpio.c		\
+				drivers/arm/sp804/sp804_delay_timer.c	\
+				drivers/delay_timer/delay_timer.c	\
+				drivers/emmc/emmc.c			\
+				drivers/fastboot/fastboot.c		\
+				drivers/fastboot/usb.c			\
+				drivers/gpio/gpio.c			\
+				drivers/io/io_block.c			\
 				drivers/io/io_fip.c			\
 				drivers/io/io_storage.c			\
-				drivers/emmc/emmc.c			\
+				drivers/partition/gpt.c			\
+				drivers/partition/partition.c		\
 				drivers/synopsys/emmc/dw_mmc.c		\
+				drivers/synopsys/usb/dw_usb.c		\
 				plat/common/aarch64/platform_up_stack.S	\
 				plat/hisilicon/hikey/hikey_bl2u_setup.c	\
-				plat/hisilicon/hikey/hikey_io_storage.c
+				plat/hisilicon/hikey/hikey_io_storage.c	\
+				plat/hisilicon/hikey/hikey_fastboot.c
 
 BL2_SOURCES		+=	drivers/arm/sp804/sp804_delay_timer.c	\
 				drivers/delay_timer/delay_timer.c	\

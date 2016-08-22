@@ -37,6 +37,7 @@
 #include <errno.h>
 #include <hi6220.h>
 #include <emmc.h>
+#include <mmio.h>
 #include <platform_def.h>
 #include <sp804_delay_timer.h>
 #include <string.h>
@@ -197,17 +198,57 @@ void bl2_plat_arch_setup(void)
 			   BL2_COHERENT_RAM_LIMIT);
 }
 
+static void reset_dwmmc_clk(void)
+{
+	unsigned int data;
+
+	/* disable mmc0 bus clock */
+	mmio_write_32(PERI_SC_PERIPH_CLKDIS0, PERI_CLK0_MMC0);
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_CLKSTAT0);
+	} while (data & PERI_CLK0_MMC0);
+	/* enable mmc0 bus clock */
+	mmio_write_32(PERI_SC_PERIPH_CLKEN0, PERI_CLK0_MMC0);
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_CLKSTAT0);
+	} while (!(data & PERI_CLK0_MMC0));
+	/* reset mmc0 clock domain */
+	mmio_write_32(PERI_SC_PERIPH_RSTEN0, PERI_RST0_MMC0);
+
+	/* bypass mmc0 clock phase */
+	data = mmio_read_32(PERI_SC_PERIPH_CTRL2);
+	data |= 3;
+	mmio_write_32(PERI_SC_PERIPH_CTRL2, data);
+
+	/* disable low power */
+	data = mmio_read_32(PERI_SC_PERIPH_CTRL13);
+	data |= 1 << 3;
+	mmio_write_32(PERI_SC_PERIPH_CTRL13, data);
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_RSTSTAT0);
+	} while (!(data & PERI_RST0_MMC0));
+
+	/* unreset mmc0 clock domain */
+	mmio_write_32(PERI_SC_PERIPH_RSTDIS0, PERI_RST0_MMC0);
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_RSTSTAT0);
+	} while (data & PERI_RST0_MMC0);
+}
+
 void bl2_platform_setup(void)
 {
 	dw_mmc_params_t params;
 
 	sp804_timer_init(SP804_TIMER0_BASE, 10, 192);
 
+	reset_dwmmc_clk();
+	memset(&params, 0, sizeof(dw_mmc_params_t));
 	params.reg_base = 0xf723d000;
 	params.desc_base = HIKEY_MMC_DESC_BASE;
 	params.desc_size = 1 << 20;
 	params.clk_rate = 24 * 1000 * 1000;
 	params.bus_width = EMMC_BUS_WIDTH_8;
+	params.flags = EMMC_FLAG_CMD23;
 	dw_mmc_init(&params);
 
 	hikey_io_setup();

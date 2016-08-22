@@ -36,6 +36,10 @@
 #include <hi6220_regs_peri.h>
 #include <hi6220_regs_pmctrl.h>
 
+#define DWMMC0_BASE				0xF723D000
+
+#define DWUSB_BASE				0xF72C0000
+
 #define PMUSSI_BASE				0xF8000000
 
 #define SP804_TIMER0_BASE			0xF8008000
