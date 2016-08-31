@@ -39,6 +39,7 @@
 #define IOMG_SD_DATA1				(IOMG_BASE + 0x18)
 #define IOMG_SD_DATA2				(IOMG_BASE + 0x1C)
 #define IOMG_SD_DATA3				(IOMG_BASE + 0x20)
+#define IOMG_GPIO24				(IOMG_BASE + 0x140)
 
 #define IOMG_MUX_FUNC0				0
 #define IOMG_MUX_FUNC1				1
@@ -53,7 +54,8 @@
 #define IOCG_SD_DATA1				(IOCG1_BASE + 0x18)
 #define IOCG_SD_DATA2				(IOCG1_BASE + 0x1C)
 #define IOCG_SD_DATA3				(IOCG1_BASE + 0x20)
-#define IOCG_GPIO1_0				(IOCG2_BASE + 0x30)
+#define IOCG_GPIO24				(IOCG1_BASE + 0x150)
+#define IOCG_GPIO8				(IOCG2_BASE + 0x30)
 
 #define IOCG_DRIVE_8MA				(2 << 4)
 #define IOCG_DRIVE_10MA				(3 << 4)

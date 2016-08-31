@@ -253,7 +253,15 @@ static void hikey_sd_init(void)
 	mmio_write_32(IOCG_SD_DATA3, IOCG_DRIVE_8MA);
 
 	/* set SD Card detect as nopull */
-	mmio_write_32(IOCG_GPIO1_0, 0);
+	mmio_write_32(IOCG_GPIO8, 0);
+}
+
+static void hikey_jumper_init(void)
+{
+	/* set jumper detect as nopull */
+	mmio_write_32(IOCG_GPIO24, 0);
+	/* set jumper detect as GPIO */
+	mmio_write_32(IOMG_GPIO24, IOMG_MUX_FUNC0);
 }
 
 void bl2_platform_setup(void)
@@ -262,6 +270,7 @@ void bl2_platform_setup(void)
 
 	sp804_timer_init(SP804_TIMER0_BASE, 10, 192);
 	hikey_sd_init();
+	hikey_jumper_init();
 
 	reset_dwmmc_clk();
 	memset(&params, 0, sizeof(dw_mmc_params_t));
