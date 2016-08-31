@@ -245,12 +245,12 @@ static void hikey_sd_init(void)
 	mmio_write_32(IOMG_SD_DATA2, IOMG_MUX_FUNC0);
 	mmio_write_32(IOMG_SD_DATA3, IOMG_MUX_FUNC0);
 
-	mmio_write_32(IOCG_SD_CLK, IOCG_DRIVE_10MA);
-	mmio_write_32(IOCG_SD_CMD, IOCG_DRIVE_8MA);
-	mmio_write_32(IOCG_SD_DATA0, IOCG_DRIVE_8MA);
-	mmio_write_32(IOCG_SD_DATA1, IOCG_DRIVE_8MA);
-	mmio_write_32(IOCG_SD_DATA2, IOCG_DRIVE_8MA);
-	mmio_write_32(IOCG_SD_DATA3, IOCG_DRIVE_8MA);
+	mmio_write_32(IOCG_SD_CLK, IOCG_INPUT_16MA);
+	mmio_write_32(IOCG_SD_CMD, IOCG_INPUT_12MA);
+	mmio_write_32(IOCG_SD_DATA0, IOCG_INPUT_12MA);
+	mmio_write_32(IOCG_SD_DATA1, IOCG_INPUT_12MA);
+	mmio_write_32(IOCG_SD_DATA2, IOCG_INPUT_12MA);
+	mmio_write_32(IOCG_SD_DATA3, IOCG_INPUT_12MA);
 
 	/* set SD Card detect as nopull */
 	mmio_write_32(IOCG_GPIO8, 0);

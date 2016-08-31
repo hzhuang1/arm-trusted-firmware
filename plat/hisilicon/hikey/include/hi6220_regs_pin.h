@@ -59,6 +59,8 @@
 
 #define IOCG_DRIVE_8MA				(2 << 4)
 #define IOCG_DRIVE_10MA				(3 << 4)
+#define IOCG_INPUT_16MA				0x64
+#define IOCG_INPUT_12MA				0x54
 #define IOCG_PULLDOWN				(1 << 1)
 #define IOCG_PULLUP				(1 << 0)
 
