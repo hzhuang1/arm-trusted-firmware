@@ -123,6 +123,9 @@ void bl31_platform_setup(void)
 {
 	/* Initialize the GIC driver, cpu and distributor interfaces */
 	gicv2_driver_init(&hikey_gic_data);
+	gicv2_distif_init();
+	gicv2_pcpu_distif_init();
+	gicv2_cpuif_enable();
 }
 
 void bl31_plat_runtime_setup(void)
