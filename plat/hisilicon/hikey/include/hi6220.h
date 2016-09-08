@@ -36,6 +36,24 @@
 #include <hi6220_regs_pin.h>
 #include <hi6220_regs_pmctrl.h>
 
+/*******************************************************************************
+ * Implementation defined ACTLR_EL2 bit definitions
+ ******************************************************************************/
+#define ACTLR_EL2_L2ACTLR_BIT		(1 << 6)
+#define ACTLR_EL2_L2ECTLR_BIT		(1 << 5)
+#define ACTLR_EL2_L2CTLR_BIT		(1 << 4)
+#define ACTLR_EL2_CPUECTLR_BIT		(1 << 1)
+#define ACTLR_EL2_CPUACTLR_BIT		(1 << 0)
+
+/*******************************************************************************
+ * Implementation defined ACTLR_EL3 bit definitions
+ ******************************************************************************/
+#define ACTLR_EL3_L2ACTLR_BIT		(1 << 6)
+#define ACTLR_EL3_L2ECTLR_BIT		(1 << 5)
+#define ACTLR_EL3_L2CTLR_BIT		(1 << 4)
+#define ACTLR_EL3_CPUECTLR_BIT		(1 << 1)
+#define ACTLR_EL3_CPUACTLR_BIT		(1 << 0)
+
 #define DWMMC0_BASE				0xF723D000
 
 #define DWUSB_BASE				0xF72C0000

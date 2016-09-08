@@ -59,6 +59,10 @@
 					BL2U_BASE - XG2RAM0_BASE,	\
 					MT_DEVICE | MT_RO | MT_SECURE)
 
+#define MAP_SRAM	MAP_REGION_FLAT(SRAM_BASE,			\
+					SRAM_SIZE,			\
+					MT_DEVICE | MT_RW | MT_SECURE)
+
 /*
  * Table of regions for different BL stages to map using the MMU.
  * This doesn't include Trusted RAM as the 'mem_layout' argument passed to
@@ -82,10 +86,19 @@ static const mmap_region_t hikey_mmap[] = {
 };
 #endif
 
-#if IMAGE_BL2 || IMAGE_BL31
+#if IMAGE_BL2
 static const mmap_region_t hikey_mmap[] = {
 	MAP_DDR,
 	MAP_DEVICE,
+	{0}
+};
+#endif
+
+#if IMAGE_BL31
+static const mmap_region_t hikey_mmap[] = {
+	MAP_DDR,
+	MAP_DEVICE,
+	MAP_SRAM,
 	{0}
 };
 #endif

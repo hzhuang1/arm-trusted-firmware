@@ -36,6 +36,8 @@
 #include <dw_mmc.h>
 #include <errno.h>
 #include <hi6220.h>
+#include <hisi_mcu.h>
+#include <hisi_sram_map.h>
 #include <emmc.h>
 #include <mmio.h>
 #include <platform_def.h>
@@ -81,6 +83,67 @@ static bl2_to_bl31_params_mem_t bl31_params_mem;
 meminfo_t *bl2_plat_sec_mem_layout(void)
 {
 	return &bl2_tzram_layout;
+}
+
+void bl2_plat_get_scp_bl2_meminfo(meminfo_t *scp_bl2_meminfo)
+{
+	scp_bl2_meminfo->total_base = SCP_BL2_BASE;
+	scp_bl2_meminfo->total_size = SCP_BL2_SIZE;
+	scp_bl2_meminfo->free_base = SCP_BL2_BASE;
+	scp_bl2_meminfo->free_size = SCP_BL2_SIZE;
+}
+
+int bl2_plat_handle_scp_bl2(struct image_info *scp_bl2_image_info)
+{
+#if 0
+	void *buf;
+
+	buf = (void *)scp_bl2_image_info->image_base;
+
+	INFO("%s: [%x] %x %x %x %x\n",
+	     __func__, (unsigned int)(uintptr_t)buf,
+	     *((unsigned int *)buf + 0),
+	     *((unsigned int *)buf + 1),
+	     *((unsigned int *)buf + 2),
+	     *((unsigned int *)buf + 3));
+	buf = (unsigned int *)buf + 50;
+	INFO("%s: [%x] %x %x %x %x\n",
+	     __func__, (unsigned int)(uintptr_t)buf,
+	     *((unsigned int *)buf + 0),
+	     *((unsigned int *)buf + 1),
+	     *((unsigned int *)buf + 2),
+	     *((unsigned int *)buf + 3));
+	buf = (unsigned int *)buf + 50;
+	INFO("%s: [%x] %x %x %x %x\n",
+	     __func__, (unsigned int)(uintptr_t)buf,
+	     *((unsigned int *)buf + 0),
+	     *((unsigned int *)buf + 1),
+	     *((unsigned int *)buf + 2),
+	     *((unsigned int *)buf + 3));
+	buf = (void *)(scp_bl2_image_info->image_base +
+		       scp_bl2_image_info->image_size - 4 * 4);
+	INFO("%s: [%x] %x %x %x %x\n",
+	     __func__, (unsigned int)(uintptr_t)buf,
+	     *((unsigned int *)buf + 0),
+	     *((unsigned int *)buf + 1),
+	     *((unsigned int *)buf + 2),
+	     *((unsigned int *)buf + 3));
+#endif
+
+	/* Enable MCU SRAM */
+	hisi_mcu_enable_sram();
+
+	/* Load MCU binary into SRAM */
+	hisi_mcu_load_image(scp_bl2_image_info->image_base,
+			    scp_bl2_image_info->image_size);
+	/* Let MCU running */
+	hisi_mcu_start_run();
+
+	INFO("%s: MCU PC is at 0x%x\n",
+	     __func__, mmio_read_32(AO_SC_MCU_SUBSYS_STAT2));
+	INFO("%s: AO_SC_PERIPH_CLKSTAT4 is 0x%x\n",
+	     __func__, mmio_read_32(AO_SC_PERIPH_CLKSTAT4));
+	return 0;
 }
 
 bl31_params_t *bl2_plat_get_bl31_params(void)
@@ -179,25 +242,6 @@ void bl2_plat_get_bl33_meminfo(meminfo_t *bl33_meminfo)
 	bl33_meminfo->free_size = DDR_SIZE;
 }
 
-void bl2_early_platform_setup(meminfo_t *mem_layout)
-{
-	/* Initialize the console to provide early debug support */
-	console_init(CONSOLE_BASE, PL011_UART_CLK_IN_HZ, PL011_BAUDRATE);
-
-	/* Setup the BL2 memory layout */
-	bl2_tzram_layout = *mem_layout;
-}
-
-void bl2_plat_arch_setup(void)
-{
-	hikey_init_mmu_el1(bl2_tzram_layout.total_base,
-			   bl2_tzram_layout.total_size,
-			   BL2_RO_BASE,
-			   BL2_RO_LIMIT,
-			   BL2_COHERENT_RAM_BASE,
-			   BL2_COHERENT_RAM_LIMIT);
-}
-
 static void reset_dwmmc_clk(void)
 {
 	unsigned int data;
@@ -235,6 +279,24 @@ static void reset_dwmmc_clk(void)
 	} while (data & PERI_RST0_MMC0);
 }
 
+#if 0
+static void hikey_boardid_init(void)
+{
+	u_register_t midr;
+
+	midr = read_midr();
+	mmio_write_32(MEMORY_AXI_CHIP_ADDR, midr);
+	INFO("[BDID] [%x] midr: 0x%x\n", MEMORY_AXI_CHIP_ADDR,
+	     (unsigned int)midr);
+
+	mmio_write_32(MEMORY_AXI_BOARD_TYPE_ADDR, 0);
+	mmio_write_32(MEMORY_AXI_BOARD_ID_ADDR, 0x2b);
+
+	mmio_write_32(ACPU_ARM64_FLAGA, 0x1234);
+	mmio_write_32(ACPU_ARM64_FLAGB, 0x5678);
+}
+#endif
+
 static void hikey_sd_init(void)
 {
 	/* switch pinmux to SD */
@@ -264,11 +326,18 @@ static void hikey_jumper_init(void)
 	mmio_write_32(IOMG_GPIO24, IOMG_MUX_FUNC0);
 }
 
-void bl2_platform_setup(void)
+void bl2_early_platform_setup(meminfo_t *mem_layout)
 {
 	dw_mmc_params_t params;
 
+	/* Initialize the console to provide early debug support */
+	console_init(CONSOLE_BASE, PL011_UART_CLK_IN_HZ, PL011_BAUDRATE);
+
+	/* Setup the BL2 memory layout */
+	bl2_tzram_layout = *mem_layout;
+
 	sp804_timer_init(SP804_TIMER0_BASE, 10, 192);
+	//hikey_boardid_init();
 	hikey_sd_init();
 	hikey_jumper_init();
 
@@ -283,4 +352,18 @@ void bl2_platform_setup(void)
 	dw_mmc_init(&params);
 
 	hikey_io_setup();
+}
+
+void bl2_plat_arch_setup(void)
+{
+	hikey_init_mmu_el1(bl2_tzram_layout.total_base,
+			   bl2_tzram_layout.total_size,
+			   BL2_RO_BASE,
+			   BL2_RO_LIMIT,
+			   BL2_COHERENT_RAM_BASE,
+			   BL2_COHERENT_RAM_LIMIT);
+}
+
+void bl2_platform_setup(void)
+{
 }

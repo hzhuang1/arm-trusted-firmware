@@ -35,6 +35,8 @@
 #include <debug.h>
 #include <errno.h>
 #include <gicv2.h>
+#include <hisi_ipc.h>
+#include <hisi_pwrc.h>
 #include <platform_def.h>
 
 #include "hikey_def.h"
@@ -126,6 +128,9 @@ void bl31_platform_setup(void)
 	gicv2_distif_init();
 	gicv2_pcpu_distif_init();
 	gicv2_cpuif_enable();
+
+	hisi_ipc_init();
+	hisi_pwrc_setup();
 }
 
 void bl31_plat_runtime_setup(void)

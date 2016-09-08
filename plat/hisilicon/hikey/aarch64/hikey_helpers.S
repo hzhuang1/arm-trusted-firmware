@@ -32,28 +32,12 @@
 #include <asm_macros.S>
 #include "../hikey_def.h"
 
-	.globl	plat_get_my_entrypoint
-	.globl	plat_is_my_cpu_primary
 	.globl	plat_my_core_pos
 	.globl	platform_mem_init
-	.globl	plat_secondary_cold_boot_setup
 	.globl	plat_crash_console_init
 	.globl	plat_crash_console_putc
 	.globl	plat_report_exception
 	.globl	plat_reset_handler
-
-func plat_get_my_entrypoint
-	mov	x0, #0
-	ret
-endfunc plat_get_my_entrypoint
-
-func plat_is_my_cpu_primary
-	mrs	x0, mpidr_el1
-	and	x0, x0, #(MPIDR_CLUSTER_MASK | MPIDR_CPU_MASK)
-	cmp	x0, #0
-	cset	x0, eq
-	ret
-endfunc plat_is_my_cpu_primary
 
 func plat_my_core_pos
 	mrs	x0, mpidr_el1
@@ -73,11 +57,6 @@ endfunc plat_my_core_pos
 func platform_mem_init
 	ret
 endfunc platform_mem_init
-
-func plat_secondary_cold_boot_setup
-cb_panic:
-	b	cb_panic
-endfunc plat_secondary_cold_boot_setup
 
 	/* ---------------------------------------------
 	 * int plat_crash_console_init(void)

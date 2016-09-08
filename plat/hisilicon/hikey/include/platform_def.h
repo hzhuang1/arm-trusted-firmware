@@ -119,6 +119,16 @@
 #define BL2U_LIMIT			(BL2U_BASE + 0x20000)
 
 /*
+ * SCP_BL2 specific defines.
+ * In HiKey, SCP_BL2 means MCU firmware. It's loaded into the temporary buffer
+ * at 0x0100_0000. Then BL2 will parse the sections and loaded them into
+ * predefined separated buffers.
+ */
+#define SCP_BL2_BASE			(DDR_BASE + 0x01000000)
+#define SCP_BL2_LIMIT			(SCP_BL2_BASE + 0x00100000)
+#define SCP_BL2_SIZE			(SCP_BL2_LIMIT - SCP_BL2_BASE)
+
+/*
  * BL31 specific defines.
  */
 #define BL31_BASE			BL2_LIMIT

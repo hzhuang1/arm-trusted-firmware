@@ -32,12 +32,15 @@ CONSOLE_BASE			:=	PL011_UART3_BASE
 CRASH_CONSOLE_BASE		:=	PL011_UART3_BASE
 PLAT_PARTITION_MAX_ENTRIES	:=	12
 PLAT_PL061_MAX_GPIOS		:=	160
+COLD_BOOT_SINGLE_CPU		:=	1
+PROGRAMMABLE_RESET_ADDRESS	:=	1
 
 # Process flags
 $(eval $(call add_define,CONSOLE_BASE))
 $(eval $(call add_define,CRASH_CONSOLE_BASE))
 $(eval $(call add_define,PLAT_PL061_MAX_GPIOS))
 $(eval $(call add_define,PLAT_PARTITION_MAX_ENTRIES))
+$(eval $(call FIP_ADD_IMG,SCP_BL2,--scp-fw))
 
 ENABLE_PLAT_COMPAT	:=	0
 
@@ -98,7 +101,8 @@ BL2_SOURCES		+=	drivers/arm/sp804/sp804_delay_timer.c	\
 				plat/common/aarch64/platform_up_stack.S	\
 				plat/hisilicon/hikey/aarch64/hikey_helpers.S \
 				plat/hisilicon/hikey/hikey_bl2_setup.c	\
-				plat/hisilicon/hikey/hikey_io_storage.c
+				plat/hisilicon/hikey/hikey_io_storage.c	\
+				plat/hisilicon/hikey/hisi_mcu.c
 
 HIKEY_GIC_SOURCES	:=	drivers/arm/gic/arm_gic.c		\
 				drivers/arm/gic/common/gic_common.c	\
@@ -113,4 +117,7 @@ BL31_SOURCES		+=	lib/cpus/aarch64/cortex_a53.S		\
 				plat/hisilicon/hikey/hikey_bl31_setup.c	\
 				plat/hisilicon/hikey/hikey_pm.c		\
 				plat/hisilicon/hikey/hikey_topology.c	\
+				plat/hisilicon/hikey/hisi_ipc.c		\
+				plat/hisilicon/hikey/hisi_pwrc.c	\
+				plat/hisilicon/hikey/hisi_pwrc_sram.S	\
 				${HIKEY_GIC_SOURCES}
