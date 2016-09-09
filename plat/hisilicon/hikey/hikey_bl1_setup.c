@@ -326,7 +326,7 @@ void bl1_platform_setup(void)
 
 	memset(&params, 0, sizeof(dw_mmc_params_t));
 	params.reg_base = DWMMC0_BASE;
-	params.desc_base = HIKEY_MMC_DESC_BASE;
+	params.desc_base = HIKEY_BL1_MMC_DESC_BASE;
 	params.desc_size = 1 << 20;
 	params.clk_rate = 24 * 1000 * 1000;
 	params.bus_width = EMMC_BUS_WIDTH_8;

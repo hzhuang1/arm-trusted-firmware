@@ -64,6 +64,15 @@
 					MT_DEVICE | MT_RW | MT_SECURE)
 
 /*
+ * BL1 needs to access the areas of MMC_SRAM.
+ * BL1 loads BL2 from eMMC into SRAM before DDR initialized.
+ */
+#define MAP_MMC_SRAM	MAP_REGION_FLAT(HIKEY_BL1_MMC_DESC_BASE,	\
+					HIKEY_BL1_MMC_DESC_SIZE +	\
+					HIKEY_BL1_MMC_DATA_SIZE,	\
+					MT_DEVICE | MT_RW | MT_SECURE)
+
+/*
  * Table of regions for different BL stages to map using the MMU.
  * This doesn't include Trusted RAM as the 'mem_layout' argument passed to
  * hikey_init_mmu_elx() will give the available subset of that,
@@ -73,6 +82,7 @@ static const mmap_region_t hikey_mmap[] = {
 	MAP_DDR,
 	MAP_DEVICE,
 	MAP_ROM_PARAM,
+	MAP_MMC_SRAM,
 	{0}
 };
 #endif
