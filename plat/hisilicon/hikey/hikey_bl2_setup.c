@@ -337,6 +337,8 @@ void bl2_early_platform_setup(meminfo_t *mem_layout)
 	bl2_tzram_layout = *mem_layout;
 
 	sp804_timer_init(SP804_TIMER0_BASE, 10, 192);
+	hikey_ddr_init();
+
 	//hikey_boardid_init();
 	hikey_sd_init();
 	hikey_jumper_init();

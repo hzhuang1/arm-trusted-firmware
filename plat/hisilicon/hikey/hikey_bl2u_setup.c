@@ -98,6 +98,9 @@ void bl2u_early_platform_setup(struct meminfo *mem_layout,
 {
 	/* Initialize the console to provide early debug support */
 	console_init(CONSOLE_BASE, PL011_UART_CLK_IN_HZ, PL011_BAUDRATE);
+
+	sp804_timer_init(SP804_TIMER0_BASE, 10, 192);
+	hikey_ddr_init();
 }
 
 void bl2u_plat_arch_setup(void)
@@ -260,8 +263,6 @@ void bl2u_platform_setup(void)
 	dw_usb_params_t usb_params;
 	fastboot_params_t fb_params;
 	char response[16];
-
-	sp804_timer_init(SP804_TIMER0_BASE, 10, 192);
 
 	memset(&emmc_params, 0, sizeof(dw_mmc_params_t));
 	emmc_params.reg_base = DWMMC0_BASE;

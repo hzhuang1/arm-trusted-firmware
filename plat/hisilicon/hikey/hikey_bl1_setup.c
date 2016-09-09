@@ -307,6 +307,176 @@ static void hikey_hi6553_init(void)
 	mmio_write_8(HI6553_CLK19M2_600_586_EN, 0x01);
 }
 
+static void init_mmc0_pll(void)
+{
+	unsigned int data;
+
+	/* select SYSPLL as the source of MMC0 */
+	/* select SYSPLL as the source of MUX1 (SC_CLK_SEL0) */
+	mmio_write_32(PERI_SC_CLK_SEL0, 1 << 5 | 1 << 21);
+	do {
+		data = mmio_read_32(PERI_SC_CLK_SEL0);
+	} while (!(data & (1 << 5)));
+	/* select MUX1 as the source of MUX2 (SC_CLK_SEL0) */
+	mmio_write_32(PERI_SC_CLK_SEL0, 1 << 29);
+	do {
+		data = mmio_read_32(PERI_SC_CLK_SEL0);
+	} while (data & (1 << 13));
+
+	mmio_write_32(PERI_SC_PERIPH_CLKEN0, (1 << 0));
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_CLKSTAT0);
+	} while (!(data & (1 << 0)));
+
+	data = mmio_read_32(PERI_SC_PERIPH_CLKEN12);
+	data |= 1 << 1;
+	mmio_write_32(PERI_SC_PERIPH_CLKEN12, data);
+
+	do {
+		mmio_write_32(PERI_SC_CLKCFG8BIT1, (1 << 7) | 0xb);
+		data = mmio_read_32(PERI_SC_CLKCFG8BIT1);
+	} while ((data & 0xb) != 0xb);
+}
+
+static void reset_mmc0_clk(void)
+{
+	unsigned int data;
+
+	/* disable mmc0 bus clock */
+	mmio_write_32(PERI_SC_PERIPH_CLKDIS0, PERI_CLK0_MMC0);
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_CLKSTAT0);
+	} while (data & PERI_CLK0_MMC0);
+	/* enable mmc0 bus clock */
+	mmio_write_32(PERI_SC_PERIPH_CLKEN0, PERI_CLK0_MMC0);
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_CLKSTAT0);
+	} while (!(data & PERI_CLK0_MMC0));
+	/* reset mmc0 clock domain */
+	mmio_write_32(PERI_SC_PERIPH_RSTEN0, PERI_RST0_MMC0);
+
+	/* bypass mmc0 clock phase */
+	data = mmio_read_32(PERI_SC_PERIPH_CTRL2);
+	data |= 3;
+	mmio_write_32(PERI_SC_PERIPH_CTRL2, data);
+
+	/* disable low power */
+	data = mmio_read_32(PERI_SC_PERIPH_CTRL13);
+	data |= 1 << 3;
+	mmio_write_32(PERI_SC_PERIPH_CTRL13, data);
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_RSTSTAT0);
+	} while (!(data & PERI_RST0_MMC0));
+
+	/* unreset mmc0 clock domain */
+	mmio_write_32(PERI_SC_PERIPH_RSTDIS0, PERI_RST0_MMC0);
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_RSTSTAT0);
+	} while (data & PERI_RST0_MMC0);
+}
+
+static void init_media_clk(void)
+{
+	unsigned int data, value;
+
+	data = mmio_read_32(PMCTRL_MEDPLLCTRL);
+	data |= 1;
+	mmio_write_32(PMCTRL_MEDPLLCTRL, data);
+
+	for (;;) {
+		data = mmio_read_32(PMCTRL_MEDPLLCTRL);
+		value = 1 << 28;
+		if ((data & value) == value)
+			break;
+	}
+
+	data = mmio_read_32(PERI_SC_PERIPH_CLKEN12);
+	data = 1 << 10;
+	mmio_write_32(PERI_SC_PERIPH_CLKEN12, data);
+}
+
+static void init_mmc1_pll(void)
+{
+	uint32_t data;
+
+	/* select SYSPLL as the source of MMC1 */
+	/* select SYSPLL as the source of MUX1 (SC_CLK_SEL0) */
+	mmio_write_32(PERI_SC_CLK_SEL0, 1 << 11 | 1 << 27);
+	do {
+		data = mmio_read_32(PERI_SC_CLK_SEL0);
+	} while (!(data & (1 << 11)));
+	/* select MUX1 as the source of MUX2 (SC_CLK_SEL0) */
+	mmio_write_32(PERI_SC_CLK_SEL0, 1 << 30);
+	do {
+		data = mmio_read_32(PERI_SC_CLK_SEL0);
+	} while (data & (1 << 14));
+
+	mmio_write_32(PERI_SC_PERIPH_CLKEN0, (1 << 1));
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_CLKSTAT0);
+	} while (!(data & (1 << 1)));
+
+	data = mmio_read_32(PERI_SC_PERIPH_CLKEN12);
+	data |= 1 << 2;
+	mmio_write_32(PERI_SC_PERIPH_CLKEN12, data);
+
+	do {
+		/* 1.2GHz / 50 = 24MHz */
+		mmio_write_32(PERI_SC_CLKCFG8BIT2, 0x31 | (1 << 7));
+		data = mmio_read_32(PERI_SC_CLKCFG8BIT2);
+	} while ((data & 0x31) != 0x31);
+}
+
+static void reset_mmc1_clk(void)
+{
+	unsigned int data;
+
+	/* disable mmc1 bus clock */
+	mmio_write_32(PERI_SC_PERIPH_CLKDIS0, PERI_CLK0_MMC1);
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_CLKSTAT0);
+	} while (data & PERI_CLK0_MMC1);
+	/* enable mmc1 bus clock */
+	mmio_write_32(PERI_SC_PERIPH_CLKEN0, PERI_CLK0_MMC1);
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_CLKSTAT0);
+	} while (!(data & PERI_CLK0_MMC1));
+	/* reset mmc1 clock domain */
+	mmio_write_32(PERI_SC_PERIPH_RSTEN0, PERI_RST0_MMC1);
+
+	/* bypass mmc1 clock phase */
+	data = mmio_read_32(PERI_SC_PERIPH_CTRL2);
+	data |= 3 << 2;
+	mmio_write_32(PERI_SC_PERIPH_CTRL2, data);
+
+	/* disable low power */
+	data = mmio_read_32(PERI_SC_PERIPH_CTRL13);
+	data |= 1 << 4;
+	mmio_write_32(PERI_SC_PERIPH_CTRL13, data);
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_RSTSTAT0);
+	} while (!(data & PERI_RST0_MMC1));
+
+	/* unreset mmc0 clock domain */
+	mmio_write_32(PERI_SC_PERIPH_RSTDIS0, PERI_RST0_MMC1);
+	do {
+		data = mmio_read_32(PERI_SC_PERIPH_RSTSTAT0);
+	} while (data & PERI_RST0_MMC1);
+}
+
+/* Initialize PLL of both eMMC and SD controllers. */
+static void hikey_mmc_pll_init(void)
+{
+	init_mmc0_pll();
+	reset_mmc0_clk();
+	init_media_clk();
+
+	dsb();
+
+	init_mmc1_pll();
+	reset_mmc1_clk();
+}
+
 /*
  * Function which will perform any remaining platform-specific setup that can
  * occur after the MMU and data cache have been enabled.
@@ -320,9 +490,7 @@ void bl1_platform_setup(void)
 	hikey_pmussi_init();
 	hikey_hi6553_init();
 
-	hikey_pll_init();
-
-	hikey_ddr_init();
+	hikey_mmc_pll_init();
 
 	memset(&params, 0, sizeof(dw_mmc_params_t));
 	params.reg_base = DWMMC0_BASE;

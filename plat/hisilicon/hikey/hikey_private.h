@@ -58,7 +58,6 @@ void hikey_init_mmu_el3(unsigned long total_base,
 			unsigned long coh_start,
 			unsigned long coh_limit);
 
-void hikey_pll_init(void);
 void hikey_ddr_init(void);
 void hikey_io_setup(void);
 
