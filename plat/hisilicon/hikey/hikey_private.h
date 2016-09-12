@@ -73,4 +73,6 @@ const char *hikey_init_serialno(void);
 int hikey_read_serialno(struct random_serial_num *serialno);
 int hikey_write_serialno(struct random_serial_num *serialno);
 
+void init_acpu_dvfs(void);
+
 #endif /* __HIKEY_PRIVATE_H__ */

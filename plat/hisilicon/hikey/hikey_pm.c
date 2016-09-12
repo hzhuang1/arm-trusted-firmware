@@ -29,7 +29,9 @@
  */
 
 #include <arch_helpers.h>
+#include <cci.h>
 #include <debug.h>
+#include <gicv2.h>
 #include <hisi_ipc.h>
 #include <hisi_pwrc.h>
 #include <hisi_sram_map.h>
@@ -48,28 +50,54 @@ static int hikey_pwr_domain_on(u_register_t mpidr)
 {
 	int cpu, cluster;
 	int curr_cluster;
-	unsigned int data;
+	//unsigned int data;
 
-	cluster = (mpidr & MPIDR_CLUSTER_MASK) >> MPIDR_AFF1_SHIFT;
-	cpu = mpidr & MPIDR_CPU_MASK;
-	curr_cluster = (read_mpidr() & MPIDR_CLUSTER_MASK) >> MPIDR_AFF1_SHIFT;
+	cluster = MPIDR_AFFLVL1_VAL(mpidr);
+	cpu = MPIDR_AFFLVL0_VAL(mpidr);
+	curr_cluster = MPIDR_AFFLVL1_VAL(read_mpidr());
 	if (cluster != curr_cluster) {
 		hisi_ipc_cluster_on(cpu, cluster);
+/*
 		NOTICE("#%s, %d, cluster:%d, curr_cluster:%d\n",
 			__func__, __LINE__, cluster, curr_cluster);
+*/
 	}
 	hisi_pwrc_set_core_bx_addr(cpu, cluster, hikey_sec_entrypoint);
 	hisi_ipc_cpu_on(cpu, cluster);
 	/* Check power state of cluster */
-	data = mmio_read_32(ACPU_CLUSTER_POWERDOWN_FLAGS_ADDR);
+	//data = mmio_read_32(ACPU_CLUSTER_POWERDOWN_FLAGS_ADDR);
+/*
 	NOTICE("#%s, %d, cluster:%d, cpu:%d, pd:0x%x\n",
 		__func__, __LINE__, cluster, cpu, data);
+*/
 	return 0;
 }
 
 static void hikey_pwr_domain_on_finish(const psci_power_state_t *target_state)
 {
-	NOTICE("#%s, %d\n", __func__, __LINE__);
+	unsigned long mpidr;
+	int cpu, cluster;
+
+	//NOTICE("#%s, %d\n", __func__, __LINE__);
+	mpidr = read_mpidr();
+	cluster = MPIDR_AFFLVL1_VAL(mpidr);
+	cpu = MPIDR_AFFLVL0_VAL(mpidr);
+	if (target_state->pwr_domain_state[MPIDR_AFFLVL1] ==
+	    PLAT_MAX_OFF_STATE) {
+		/*
+		 * Enable CCI coherency for this cluster.
+		 * No need for locks as no other cpu is active at the moment.
+		 */
+		cci_enable_snoop_dvm_reqs(MPIDR_AFFLVL1_VAL(mpidr));
+	}
+
+	/* Zero the jump address in the mailbox for this cpu */
+	hisi_pwrc_set_core_bx_addr(cpu, cluster, 0);
+
+	/* Program the GIC per-cpu distributor or re-distributor interface */
+	gicv2_pcpu_distif_init();
+	/* Enable the GIC cpu interface */
+	gicv2_cpuif_enable();
 }
 
 /*******************************************************************************

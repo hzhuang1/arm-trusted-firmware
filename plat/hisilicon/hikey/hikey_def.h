@@ -86,16 +86,19 @@
 
 /*
  * HIKEY_MMC_DATA_BASE & HIKEY_MMC_DATA_SIZE are shared between fastboot
- * and emmc driver. Since it could avoid to memory copy.
+ * and eMMC driver. Since it could avoid to memory copy.
+ * So this SRAM region is used twice. First, it's used in BL1 as temporary
+ * buffer in eMMC driver. Second, it's used by MCU in BL2. The SRAM region
+ * needs to be clear before used in BL2.
  */
 #define HIKEY_MMC_DATA_BASE		(DDR_BASE + 0x10000000)
 #define HIKEY_MMC_DATA_SIZE		0x20000000
 #define HIKEY_NS_IMAGE_OFFSET		(DDR_BASE + 0x35000000)
-#define HIKEY_BL1_MMC_DESC_BASE		(0xFFF85000)
-#define HIKEY_BL1_MMC_DESC_SIZE		(0x00001000)
+#define HIKEY_BL1_MMC_DESC_BASE		(SRAM_BASE)
+#define HIKEY_BL1_MMC_DESC_SIZE		0x00001000
 #define HIKEY_BL1_MMC_DATA_BASE		(HIKEY_BL1_MMC_DESC_BASE +	\
 					 HIKEY_BL1_MMC_DESC_SIZE)
-#define HIKEY_BL1_MMC_DATA_SIZE		0x0000A000
+#define HIKEY_BL1_MMC_DATA_SIZE		0x0000B000
 
 #define MMC_BASE			0
 #define HIKEY_FIP_BASE			(MMC_BASE + (4 << 20))

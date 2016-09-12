@@ -33,13 +33,13 @@
 #include <bl_common.h>
 #include <console.h>
 #include <debug.h>
-#include <partitions.h>
 #include <platform.h>
 #include <platform_def.h>
 #include <string.h>
 #include <mmio.h>
 #include <hi6220.h>
 #include <hi6553.h>
+#include <hisi_sram_map.h>
 
 #define ACPU_FREQ_MAX_NUM  		5
 #define	ACPU_OPP_NUM			7
@@ -669,7 +669,7 @@ int acpu_dvfs_target(unsigned int curr_prof, unsigned int target_prof)
 		ret = acpu_dvfs_freq_ascend(curr_prof, target_prof);
 
 	if (ret) {
-		ERROR("%s: acpu_dvfs_target failed!\n");
+		ERROR("%s: acpu_dvfs_target failed!\n", __func__);
 		return -1;
 	}
 
@@ -785,7 +785,8 @@ void init_acpu_dvfs(void)
 {
 	unsigned int i = 0;
 
-	INFO("%s: pmic version %d\n", __func__, hi6553_read_8(VERSION_REG));
+	INFO("%s: pmic version %d\n", __func__,
+	     mmio_read_8(HI6553_VERSION_REG));
 
 	/* init parameters */
 	mmio_write_32(ACPU_CHIP_MAX_FREQ, efuse_acpu_freq[8]);

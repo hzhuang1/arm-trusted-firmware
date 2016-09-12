@@ -485,6 +485,9 @@ void bl1_platform_setup(void)
 {
 	dw_mmc_params_t params;
 
+	assert((HIKEY_BL1_MMC_DESC_BASE >= SRAM_BASE) &&
+	       ((SRAM_BASE + SRAM_SIZE) >=
+		(HIKEY_BL1_MMC_DATA_BASE + HIKEY_BL1_MMC_DATA_SIZE)));
 	hikey_sp804_init();
 	hikey_gpio_init();
 	hikey_pmussi_init();

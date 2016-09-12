@@ -31,6 +31,7 @@
 #ifndef __HI6220_H__
 #define __HI6220_H__
 
+#include <hi6220_regs_acpu.h>
 #include <hi6220_regs_ao.h>
 #include <hi6220_regs_peri.h>
 #include <hi6220_regs_pin.h>

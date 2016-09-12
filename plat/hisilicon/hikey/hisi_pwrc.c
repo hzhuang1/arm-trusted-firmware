@@ -95,10 +95,6 @@ int hisi_pwrc_setup(void)
 
 	memcpy((void *)PWRCTRL_ACPU_ASM_CODE_BASE, (void *)pm_asm_code,
 	       pm_asm_code_end - pm_asm_code);
-#if 0
-	memset((void *)PWRCTRL_ACPU_ASM_DATA_BASE, 0,
-	       PWRCTRL_ACPU_ASM_DATA_SIZE);
-#endif
 
 	reg = mmio_read_32(AO_SC_SYS_CTRL1);
 	reg |= AO_SC_SYS_CTRL1_REMAP_SRAM_AARM |

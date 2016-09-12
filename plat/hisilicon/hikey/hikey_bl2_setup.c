@@ -279,7 +279,6 @@ static void reset_dwmmc_clk(void)
 	} while (data & PERI_RST0_MMC0);
 }
 
-#if 0
 static void hikey_boardid_init(void)
 {
 	u_register_t midr;
@@ -295,7 +294,6 @@ static void hikey_boardid_init(void)
 	mmio_write_32(ACPU_ARM64_FLAGA, 0x1234);
 	mmio_write_32(ACPU_ARM64_FLAGB, 0x5678);
 }
-#endif
 
 static void hikey_sd_init(void)
 {
@@ -336,10 +334,14 @@ void bl2_early_platform_setup(meminfo_t *mem_layout)
 	/* Setup the BL2 memory layout */
 	bl2_tzram_layout = *mem_layout;
 
+	/* Clear SRAM since it'll be used by MCU right now. */
+	memset((void *)SRAM_BASE, 0, SRAM_SIZE);
+
 	sp804_timer_init(SP804_TIMER0_BASE, 10, 192);
 	hikey_ddr_init();
 
-	//hikey_boardid_init();
+	hikey_boardid_init();
+	init_acpu_dvfs();
 	hikey_sd_init();
 	hikey_jumper_init();
 
