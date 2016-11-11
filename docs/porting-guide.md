@@ -512,6 +512,13 @@ optionally be defined:
     PLAT_PARTITION_MAX_ENTRIES	:=	12
     $(eval $(call add_define,PLAT_PARTITION_MAX_ENTRIES))
 
+*   **PLAT_PARTITION_BLOCK_SIZE**
+    The block size of storage device. Since there's different block size in
+    different storage device. The default value is 512.
+    [For example, define the build flag in platform.mk]:
+    PLAT_PARTITION_BLOCK_SIZE 	:= 	4096
+    $(eval $(call add define,PLAT_PARTITION_BLOCK_SIZE))
+
 
 ### File : plat_macros.S [mandatory]
 
