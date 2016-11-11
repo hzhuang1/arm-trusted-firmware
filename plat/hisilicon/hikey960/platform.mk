@@ -32,16 +32,19 @@ CONSOLE_BASE			:=	PL011_UART5_BASE
 CRASH_CONSOLE_BASE		:=	PL011_UART5_BASE
 COLD_BOOT_SINGLE_CPU		:=	1
 PROGRAMMABLE_RESET_ADDRESS	:=	1
+PLAT_PARTITION_BLOCK_SIZE 	:= 	4096
 
 # Process flags
 $(eval $(call add_define,CONSOLE_BASE))
 $(eval $(call add_define,CRASH_CONSOLE_BASE))
+$(eval $(call add_define,PLAT_PARTITION_BLOCK_SIZE))
 
 ENABLE_PLAT_COMPAT	:=	0
 
 USE_COHERENT_MEM	:=	1
 
 PLAT_INCLUDES		:=	-Iinclude/common/tbbr			\
+				-Iplat/hisilicon/common/include 	\
 				-Iplat/hisilicon/hikey960/include
 
 PLAT_BL_COMMON_SOURCES	:=	drivers/arm/pl011/pl011_console.S	\
@@ -61,3 +64,18 @@ BL1_SOURCES		+=	bl1/tbbr/tbbr_img_desc.c		\
 				plat/hisilicon/hikey960/aarch64/hikey960_helpers.S \
 				plat/hisilicon/hikey960/hikey960_bl1_setup.c 	\
 				plat/hisilicon/hikey960/hikey960_io_storage.c
+
+BL2U_SOURCES		+=	drivers/arm/sp804/sp804_delay_timer.c	\
+				drivers/delay_timer/delay_timer.c	\
+				drivers/io/io_block.c			\
+				drivers/io/io_fip.c			\
+				drivers/io/io_storage.c			\
+				drivers/partition/gpt.c 		\
+				drivers/partition/partition.c 		\
+				drivers/synopsys/ufs/dw_ufs.c 		\
+				drivers/ufs/ufs.c 			\
+				plat/common/aarch64/platform_up_stack.S	\
+				plat/hisilicon/common/mailbox/mailbox.c \
+				plat/hisilicon/hikey960/hikey960_bl2u_setup.c \
+				plat/hisilicon/hikey960/hikey960_io_storage.c \
+				plat/hisilicon/hikey960/hi3660_mailbox.c
