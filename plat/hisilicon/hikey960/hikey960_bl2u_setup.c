@@ -74,7 +74,8 @@
  */
 #define IDX_START 			0
 #define IDX_VERSION 			1
-#define IDX_CMD 			2
+#define IDX_LEN 			2
+#define IDX_CMD 			3
 #define IDX_DATA 			4
 
 #define IPC_START_FRAME 		0xA7
@@ -98,7 +99,7 @@ void bl2u_early_platform_setup(struct meminfo *mem_layout,
 void bl2u_plat_arch_setup(void)
 {
 	hikey960_init_mmu_el1(BL2U_RO_LIMIT,
-			      BL31_LIMIT - BL2U_RO_LIMIT,
+			      BL2U_LIMIT - BL2U_RO_LIMIT,
 			      BL2U_RO_BASE,
 			      BL2U_RO_LIMIT,
 			      BL2U_COHERENT_RAM_BASE,
@@ -125,8 +126,9 @@ static void hikey960_timer_init(void)
 static void hikey960_ipc_init(void)
 {
 	mbox_params_t mbox_params;
-	unsigned char tx_buf[MBX_MAX_DATA_LEN];
-	int result;
+	unsigned char tx_buf[MBX_MAX_DATA_LEN], rx_buf[MBX_MAX_DATA_LEN];
+	unsigned int *buf;
+	int result, count;
 
 	memset(&mbox_params, 0, sizeof(mbox_params));
 	mbox_params.chans = MBX_MAX_CHANNELS;
@@ -144,12 +146,19 @@ static void hikey960_ipc_init(void)
 	memset((void *)tx_buf, 0, MBX_MAX_DATA_LEN);
 	tx_buf[IDX_START] = IPC_START_FRAME;
 	tx_buf[IDX_VERSION] = 1;
+	tx_buf[IDX_LEN] = 1;
 	tx_buf[IDX_CMD] = IPC_CMD_USB_DOWNLOAD;
-	tx_buf[IDX_DATA] = 1;
+	buf = (unsigned int *)tx_buf;
 	result = mbox_send_message(IPC_A53_LPM3_CHANNEL, tx_buf, 4);
 	assert(result == 0);
-	/* Wait IPC Ack */
-	for (;;);
+	memset((void *)rx_buf, 0, MBX_MAX_DATA_LEN);
+	/* Receive response message from IPC */
+	result = mbox_recv_message(IPC_LPM3_A53_CHANNEL, rx_buf, &count);
+	buf = (unsigned int *)rx_buf;
+	VERBOSE("IPC recv:%x-%x-%x-%x %x-%x-%x-%x\n",
+		buf[0], buf[1], buf[2], buf[3],
+		buf[4], buf[5], buf[6], buf[7]);
+	assert(result == 0);
 }
 
 //#define DEBUG_RESET_UFS
