@@ -65,6 +65,16 @@ BL1_SOURCES		+=	bl1/tbbr/tbbr_img_desc.c		\
 				plat/hisilicon/hikey960/hikey960_bl1_setup.c 	\
 				plat/hisilicon/hikey960/hikey960_io_storage.c
 
+BL2_SOURCES		+=	drivers/arm/sp804/sp804_delay_timer.c 	\
+				drivers/delay_timer/delay_timer.c	\
+				drivers/io/io_block.c			\
+				drivers/io/io_fip.c			\
+				drivers/io/io_storage.c			\
+				drivers/ufs/ufs.c			\
+				plat/common/aarch64/platform_up_stack.S	\
+				plat/hisilicon/hikey960/hikey960_bl2_setup.c \
+				plat/hisilicon/hikey960/hikey960_io_storage.c
+
 BL2U_SOURCES		+=	drivers/arm/sp804/sp804_delay_timer.c	\
 				drivers/delay_timer/delay_timer.c	\
 				drivers/io/io_block.c			\
