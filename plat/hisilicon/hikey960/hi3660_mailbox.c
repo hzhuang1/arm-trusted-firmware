@@ -90,14 +90,30 @@ static int hi3660_mbox_recv(int chan, void *message, int *len)
 	assert((chan_map[chan].used != 0) &&
 	       (chan_map[chan].src != 0) &&
 	       (chan_map[chan].dst != 0));
-	unsigned int *buf;
+	unsigned int *buf, data;
 	int i;
 
+	/* wait IPC event */
+	do {
+		data = mmio_read_32(MBX_MODE(chan));
+	} while ((data & MBX_MODE_STATE_STATUS_MASK) != MBX_MODE_STATE_DEST);
+	/* wait to clear interrupt */
+	do {
+		data = mmio_read_32(MBX_ICLR(chan));
+	} while (data == 0);
+	do {
+		mmio_write_32(MBX_ICLR(chan), chan_map[chan].dst);
+		data = mmio_read_32(MBX_ICLR(chan));
+	} while (data);
+
+	/* read data from IPC */
 	buf = (unsigned int *)message;
-	for (i = 0; i < (MBX_MAX_DATA_LEN >> 2); i++) {
-		*(buf + i) = mmio_read_32(MBX_DATA0(chan) + i);
+	for (i = 0; i < MBX_MAX_DATA_LEN; i += 4) {
+		*(buf + (i >> 2)) = mmio_read_32(MBX_DATA0(chan) + i);
 	}
 	*len = MBX_MAX_DATA_LEN;
+	/* ack */
+	mmio_write_32(MBX_SEND(chan), chan_map[chan].dst);
 	return 0;
 }
 
@@ -129,8 +145,6 @@ static int hi3660_mbox_request(int chan, int direction)
 	mmio_write_32(MBX_DCLEAR(chan), (~dst) & CPU_MASK);
 	mmio_write_32(MBX_DSET(chan), dst);
 	data = mmio_read_32(MBX_DSTATUS(chan));
-	INFO("#%s, %d, dest:0x%x, dst:0x%x\n", __func__, __LINE__,
-		mmio_read_32(MBX_DSTATUS(chan)), dst);
 	assert((data & dst) != 0);
 
 	/* clear auto link & auto answer */
