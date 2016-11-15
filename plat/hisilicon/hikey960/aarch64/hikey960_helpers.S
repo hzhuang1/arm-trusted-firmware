@@ -107,7 +107,7 @@ func plat_report_exception
 	str	w1, [x2, #32]
 
 	mrs	x2, currentel
-	and	x2, x2, #0xc0
+	and	x2, x2, #0x0c
 	/* Check EL1 */
 	cmp	x2, #0x04
 	beq	plat_report_el1
