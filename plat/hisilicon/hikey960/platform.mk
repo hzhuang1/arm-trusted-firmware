@@ -86,6 +86,7 @@ BL2U_SOURCES		+=	drivers/arm/sp804/sp804_delay_timer.c	\
 				drivers/ufs/ufs.c 			\
 				plat/common/aarch64/platform_up_stack.S	\
 				plat/hisilicon/common/mailbox/mailbox.c \
+				plat/hisilicon/hikey960/aarch64/hikey960_helpers.S \
 				plat/hisilicon/hikey960/hikey960_bl2u_setup.c \
 				plat/hisilicon/hikey960/hikey960_io_storage.c \
 				plat/hisilicon/hikey960/hi3660_mailbox.c
