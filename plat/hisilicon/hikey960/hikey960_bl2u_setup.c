@@ -158,7 +158,18 @@ static void hikey960_ipc_init(void)
 	VERBOSE("IPC recv:%x-%x-%x-%x %x-%x-%x-%x\n",
 		buf[0], buf[1], buf[2], buf[3],
 		buf[4], buf[5], buf[6], buf[7]);
+	(void)buf;
 	assert(result == 0);
+}
+
+static void hikey960_jump_fwu(void)
+{
+	/* goto BL31_LIMIT */
+	uintptr_t pc = BL31_LIMIT;
+	__asm__ volatile (
+		"br	%0\n"
+		: : "r"(pc)
+	);
 }
 
 //#define DEBUG_RESET_UFS
@@ -193,4 +204,6 @@ void bl2u_platform_setup(void)
 	partition_init(BL2U_IMAGE_ID, HIKEY960_UFS_DATA_BASE + 0x8000, 0x1000);
 
 	hikey960_ipc_init();
+	hikey960_jump_fwu();
+	assert(0);
 }
