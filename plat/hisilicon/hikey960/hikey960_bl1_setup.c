@@ -36,9 +36,9 @@
 #include <errno.h>
 #include <hi3660.h>
 #include <mmio.h>
+#include <generic_delay_timer.h>
 #include <platform.h>
 #include <platform_def.h>
-#include <sp804_delay_timer.h>
 #include <string.h>
 #include <tbbr/tbbr_img_desc.h>
 #include <ufs.h>
@@ -131,23 +131,6 @@ static void hikey960_pmu_init(void)
 			NP_XO_ABB_DIG);
 }
 
-static void hikey960_timer_init(void)
-{
-	unsigned int data;
-
-	/* unreset TIMER9 */
-	mmio_write_32(CRG_REG_BASE + CRG_PERRSTDIS1_OFFSET, PERI_TIMER9_BIT);
-	do {
-		data = mmio_read_32(CRG_REG_BASE + CRG_PERRSTSTAT1_OFFSET);
-	} while (data & PERI_TIMER9_BIT);
-	/* enable TIMER9 */
-	mmio_write_32(CRG_REG_BASE + CRG_PEREN1_OFFSET, PERI_TIMER9_BIT);
-	do {
-		data = mmio_read_32(CRG_REG_BASE + CRG_PERSTAT1_OFFSET);
-	} while ((data & PERI_TIMER9_BIT) == 0);
-	sp804_timer_init(TIMER9_REG_BASE, 15625, 512); 		/* 32.768KHz */
-}
-
 static void hikey960_ufs_init(void)
 {
 	ufs_params_t ufs_params;
@@ -168,7 +151,7 @@ void bl1_platform_setup(void)
 {
 	hikey960_clk_init();
 	hikey960_pmu_init();
-	hikey960_timer_init();
+	generic_delay_timer_init();
 	hikey960_ufs_init();
 	hikey960_io_setup();
 }
