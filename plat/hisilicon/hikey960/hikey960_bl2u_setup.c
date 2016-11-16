@@ -166,6 +166,19 @@ static void hikey960_jump_fwu(void)
 {
 	/* goto BL31_LIMIT */
 	uintptr_t pc = BL31_LIMIT;
+	unsigned int data = 0;
+	/* Disable FPEN not to trap EL0 and EL1 access to the SIMD and
+	 * floating-point registers to EL1. Since UEFI will save some
+	 * floating-point registers into stack.
+	 */
+	__asm__ volatile (
+		"mrs	%0, cpacr_el1\n"
+		"orr	%0, %0, #(3 << 20)\n"
+		"msr	cpacr_el1, %0\n"
+		: "=r"(data)
+		: "r"(data)
+	);
+	INFO("cpacr_el1:0x%x\n", data);
 	__asm__ volatile (
 		"br	%0\n"
 		: : "r"(pc)
