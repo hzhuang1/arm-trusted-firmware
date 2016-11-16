@@ -167,6 +167,8 @@ unsigned int bl1_plat_get_next_image_id(void)
 	mode = mmio_read_32(SCTRL_REG_BASE + SCTRL_BAK_DATA0_OFFSET);
 	switch (mode & BOOT_MODE_MASK) {
 	case BOOT_MODE_RECOVERY:
+		/* CNTFRQ is read-only in EL1 */
+		write_cntfrq_el0(plat_get_syscnt_freq2());
 		ret = BL2U_IMAGE_ID;
 		break;
 	case BOOT_MODE_NORMAL:
