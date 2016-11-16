@@ -33,6 +33,7 @@
 #include <bl_common.h>
 #include <console.h>
 #include <debug.h>
+#include <delay_timer.h>
 #include <errno.h>
 #include <hi3660.h>
 #include <mmio.h>
@@ -167,9 +168,11 @@ unsigned int bl1_plat_get_next_image_id(void)
 	mode = mmio_read_32(SCTRL_REG_BASE + SCTRL_BAK_DATA0_OFFSET);
 	switch (mode & BOOT_MODE_MASK) {
 	case BOOT_MODE_RECOVERY:
-		/* CNTFRQ is read-only in EL1 */
-		write_cntfrq_el0(plat_get_syscnt_freq2());
+#if 0
 		ret = BL2U_IMAGE_ID;
+#else
+		ret = NS_BL1U_IMAGE_ID;
+#endif
 		break;
 	case BOOT_MODE_NORMAL:
 		ret = BL2_IMAGE_ID;
@@ -198,4 +201,21 @@ image_desc_t *bl1_plat_get_image_desc(unsigned int image_id)
 void bl1_plat_set_ep_info(unsigned int image_id,
 		entry_point_info_t *ep_info)
 {
+	unsigned int data = 0;
+
+	if (image_id == BL2_IMAGE_ID)
+		return;
+	/* CNTFRQ is read-only in EL1 */
+	write_cntfrq_el0(plat_get_syscnt_freq2());
+	__asm__ volatile ("mrs	%0, cpacr_el1" : "=r"(data));
+	do {
+		data |= 3 << 20;
+		__asm__ volatile ("msr	cpacr_el1, %0" : : "r"(data));
+		__asm__ volatile ("mrs	%0, cpacr_el1" : "=r"(data));
+	} while ((data & (3 << 20)) != (3 << 20));
+	INFO("cpacr_el1:0x%x\n", data);
+
+	ep_info->args.arg0 = 0xffff & read_mpidr();
+	ep_info->spsr = SPSR_64(MODE_EL1, MODE_SP_ELX,
+				DISABLE_ALL_EXCEPTIONS);
 }

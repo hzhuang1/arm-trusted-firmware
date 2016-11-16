@@ -81,17 +81,21 @@
 #define BL1_RW_SIZE			(0x00088000)
 #define BL1_RW_LIMIT			(0x1AC98000)
 
+#define NS_BL1U_BASE			(BL1_RW_BASE + 0x8000)	/* 1AC1_8000 */
+
 /*
  * BL2 specific defines.
  */
 #define BL2_BASE			(BL1_RW_BASE + 0x8000)	/* 1AC1_8000 */
 #define BL2_LIMIT			(BL2_BASE + 0x40000) 	/* 1AC5_8000 */
 
+#if 0
 /*
  * BL2U specific defines.
  */
 #define BL2U_BASE			BL2_BASE 		/* 1AC1_8000 */
 #define BL2U_LIMIT			(BL2U_BASE + 0x20000) 	/* 1AC3_8000 */
+#endif
 
 /*
  * BL31 specific defines.
