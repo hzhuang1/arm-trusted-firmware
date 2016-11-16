@@ -53,8 +53,8 @@ PLAT_BL_COMMON_SOURCES	:=	drivers/arm/pl011/pl011_console.S	\
 				plat/hisilicon/hikey960/aarch64/hikey960_common.c
 
 BL1_SOURCES		+=	bl1/tbbr/tbbr_img_desc.c		\
-				drivers/arm/sp804/sp804_delay_timer.c	\
 				drivers/delay_timer/delay_timer.c	\
+				drivers/delay_timer/generic_delay_timer.c \
 				drivers/io/io_block.c			\
 				drivers/io/io_fip.c			\
 				drivers/io/io_storage.c			\
@@ -65,8 +65,8 @@ BL1_SOURCES		+=	bl1/tbbr/tbbr_img_desc.c		\
 				plat/hisilicon/hikey960/hikey960_bl1_setup.c 	\
 				plat/hisilicon/hikey960/hikey960_io_storage.c
 
-BL2_SOURCES		+=	drivers/arm/sp804/sp804_delay_timer.c 	\
-				drivers/delay_timer/delay_timer.c	\
+BL2_SOURCES		+=	drivers/delay_timer/delay_timer.c	\
+				drivers/delay_timer/generic_delay_timer.c \
 				drivers/io/io_block.c			\
 				drivers/io/io_fip.c			\
 				drivers/io/io_storage.c			\
@@ -75,8 +75,8 @@ BL2_SOURCES		+=	drivers/arm/sp804/sp804_delay_timer.c 	\
 				plat/hisilicon/hikey960/hikey960_bl2_setup.c \
 				plat/hisilicon/hikey960/hikey960_io_storage.c
 
-BL2U_SOURCES		+=	drivers/arm/sp804/sp804_delay_timer.c	\
-				drivers/delay_timer/delay_timer.c	\
+BL2U_SOURCES		+=	drivers/delay_timer/delay_timer.c	\
+				drivers/delay_timer/generic_delay_timer.c \
 				drivers/io/io_block.c			\
 				drivers/io/io_fip.c			\
 				drivers/io/io_storage.c			\
