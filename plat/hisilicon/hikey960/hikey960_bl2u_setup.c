@@ -34,13 +34,13 @@
 #include <debug.h>
 #include <dw_ufs.h>
 #include <errno.h>
+#include <generic_delay_timer.h>
 #include <hi3660.h>
 #include <hi3660_mailbox.h>
 #include <mailbox.h>
 #include <mmio.h>
 #include <partition/partition.h>
 #include <platform.h>
-#include <sp804_delay_timer.h>
 #include <string.h>
 #include <ufs.h>
 
@@ -104,23 +104,6 @@ void bl2u_plat_arch_setup(void)
 			      BL2U_RO_LIMIT,
 			      BL2U_COHERENT_RAM_BASE,
 			      BL2U_COHERENT_RAM_LIMIT);
-}
-
-static void hikey960_timer_init(void)
-{
-	unsigned int data;
-
-	/* unreset TIMER9 */
-	mmio_write_32(CRG_REG_BASE + CRG_PERRSTDIS1_OFFSET, PERI_TIMER9_BIT);
-	do {
-		data = mmio_read_32(CRG_REG_BASE + CRG_PERRSTSTAT1_OFFSET);
-	} while (data & PERI_TIMER9_BIT);
-	/* enable TIMER9 */
-	mmio_write_32(CRG_REG_BASE + CRG_PEREN1_OFFSET, PERI_TIMER9_BIT);
-	do {
-		data = mmio_read_32(CRG_REG_BASE + CRG_PERSTAT1_OFFSET);
-	} while ((data & PERI_TIMER9_BIT) == 0);
-	sp804_timer_init(TIMER9_REG_BASE, 15625, 512); 		/* 32.768KHz */
 }
 
 static void hikey960_ipc_init(void)
@@ -194,7 +177,7 @@ void bl2u_platform_setup(void)
 	unsigned int data;
 #endif
 
-	hikey960_timer_init();
+	generic_delay_timer_init();
 #ifdef DEBUG_RESET_UFS
 	/* reset UFS */
 	mmio_write_32(CRG_REG_BASE + CRG_PERRSTEN3_OFFSET, PERI_UFS_BIT);
