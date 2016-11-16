@@ -119,5 +119,5 @@ unsigned long plat_get_ns_image_entrypoint(void)
 
 unsigned int plat_get_syscnt_freq2(void)
 {
-	return 1200000;
+	return 1920000;
 }
