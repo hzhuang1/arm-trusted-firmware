@@ -55,8 +55,9 @@
 #define PL011_UART_CLK_IN_HZ		19200000
 
 #define UFS_BASE			0
-#define HIKEY960_FIP_BASE		(UFS_BASE + (4 << 20))
-#define HIKEY960_FIP_MAX_SIZE		(8 << 20)
+/* hack to oeminfo partition entry with hisilicon x-loader */
+#define HIKEY960_FIP_BASE		(UFS_BASE + (16 << 20))
+#define HIKEY960_FIP_MAX_SIZE		(12 << 20)
 
 #define HIKEY960_UFS_DESC_BASE 		0x20000000
 #define HIKEY960_UFS_DESC_SIZE 		0x00010000 	/* 64KB */
