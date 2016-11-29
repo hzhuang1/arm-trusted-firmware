@@ -144,6 +144,16 @@ static void hikey960_ufs_init(void)
 	ufs_init(NULL, &ufs_params);
 }
 
+static void hikey960_tzc_init(void)
+{
+	mmio_write_32(TZC_REG_BASE + TZC_EN0_OFFSET, 0x3FE3FFC6);
+	mmio_write_32(TZC_REG_BASE + TZC_EN1_OFFSET, 0xFFFFC3FC);
+	mmio_write_32(TZC_REG_BASE + TZC_EN2_OFFSET, 0x0000000C);
+	mmio_write_32(TZC_REG_BASE + TZC_EN3_OFFSET, 0x20000000);
+	mmio_write_32(TZC_REG_BASE + TZC_EN4_OFFSET, 0xF63FCFFF);
+	mmio_write_32(TZC_REG_BASE + TZC_EN5_OFFSET, 0x00040F80);
+}
+
 /*
  * Function which will perform any remaining platform-specific setup that can
  * occur after the MMU and data cache have been enabled.
@@ -153,6 +163,7 @@ void bl1_platform_setup(void)
 	hikey960_clk_init();
 	hikey960_pmu_init();
 	generic_delay_timer_init();
+	hikey960_tzc_init();
 	hikey960_ufs_init();
 	hikey960_io_setup();
 }
