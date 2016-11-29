@@ -46,7 +46,7 @@
 					MT_DEVICE | MT_RW | MT_NS)
 
 #define MAP_BL 		MAP_REGION_FLAT(BL1_RO_BASE, 			\
-					BL31_LIMIT - BL1_RO_BASE,	\
+					BL2_LIMIT - BL1_RO_BASE,	\
 					MT_DEVICE | MT_RW | MT_NS)
 
 #define MAP_FWU		MAP_REGION_FLAT(BL31_LIMIT,			\
@@ -62,10 +62,18 @@
  * This doesn't include Trusted RAM as the 'mem_layout' argument passed to
  * hikey960_init_mmu_elx() will give the available subset of that,
  */
-#if IMAGE_BL1 || IMAGE_BL2 || IMAGE_BL31
+#if IMAGE_BL1
 static const mmap_region_t hikey960_mmap[] = {
 	MAP_DDR,
 	MAP_BL,
+	MAP_DEVICE,
+	{0}
+};
+#endif
+
+#if IMAGE_BL2 || IMAGE_BL31
+static const mmap_region_t hikey960_mmap[] = {
+	MAP_DDR,
 	MAP_DEVICE,
 	{0}
 };
