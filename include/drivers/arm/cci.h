@@ -94,6 +94,9 @@
 #define SUPPORT_SNOOPS			(1 << 30)
 #define SUPPORT_DVM			(1 << 31)
 
+/* Secure Access register bit definitions */
+#define NON_SECURE_EN_BIT		(1 << 0)
+
 /* Status register bit definitions */
 #define CHANGE_PENDING_BIT		(1 << 0)
 

@@ -71,6 +71,9 @@
 #define DVM_EN_BIT			(1 << 1)
 #define SNOOP_EN_BIT			(1 << 0)
 
+/* Secure Access register bit definitions */
+#define NON_SECURE_EN_BIT		(1 << 0)
+
 /* Status register bit definitions */
 #define CHANGE_PENDING_BIT		(1 << 0)
 
