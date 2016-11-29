@@ -114,7 +114,7 @@
 
 #define MAX_MMAP_REGIONS		16
 
-#define HIKEY960_NS_IMAGE_OFFSET	(DDR_BASE + 0x35000000)
+#define HIKEY960_NS_IMAGE_OFFSET	(DDR_BASE + 0x1AC98000)
 
 /*
  * Declarations and constants to access the mailboxes safely. Each mailbox is

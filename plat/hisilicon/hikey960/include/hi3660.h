@@ -180,6 +180,26 @@
 
 #define LP_CONFIG_REG_BASE 		0xFFF3F000
 
+#define CCI400_REG_BASE			0xE8100000
+#define CCI400_SL_IFACE3_CLUSTER_IX	0
+#define CCI400_SL_IFACE4_CLUSTER_IX	1
+
+#define GICD_REG_BASE			0xE82B1000
+#define GICC_REG_BASE			0xE82B2000
+/*
+ * GIC400 interrupt handling related constants
+ */
+#define IRQ_SEC_PHY_TIMER		29
+#define IRQ_SEC_SGI_0			8
+#define IRQ_SEC_SGI_1			9
+#define IRQ_SEC_SGI_2			10
+#define IRQ_SEC_SGI_3			11
+#define IRQ_SEC_SGI_4			12
+#define IRQ_SEC_SGI_5			13
+#define IRQ_SEC_SGI_6			14
+#define IRQ_SEC_SGI_7			15
+#define IRQ_SEC_SGI_8			16
+
 #define IOMG_REG_BASE 			0xE896C000
 
 #define IOMG_UART5_RX_OFFSET 		0x0BC

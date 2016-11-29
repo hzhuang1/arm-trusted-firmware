@@ -74,3 +74,18 @@ BL2_SOURCES		+=	drivers/delay_timer/delay_timer.c	\
 				plat/common/aarch64/platform_up_stack.S	\
 				plat/hisilicon/hikey960/hikey960_bl2_setup.c \
 				plat/hisilicon/hikey960/hikey960_io_storage.c
+
+HIKEY960_GIC_SOURCES	:=	drivers/arm/gic/common/gic_common.c	\
+				drivers/arm/gic/v2/gicv2_main.c		\
+				drivers/arm/gic/v2/gicv2_helpers.c	\
+				plat/common/plat_gicv2.c
+
+BL31_SOURCES		+=	drivers/arm/cci/cci.c			\
+				lib/cpus/aarch64/cortex_a53.S           \
+				plat/common/aarch64/platform_mp_stack.S \
+				plat/common/aarch64/plat_psci_common.c  \
+				plat/hisilicon/hikey960/aarch64/hikey960_helpers.S \
+				plat/hisilicon/hikey960/hikey960_bl31_setup.c \
+				plat/hisilicon/hikey960/hikey960_pm.c	\
+				plat/hisilicon/hikey960/hikey960_topology.c \
+				${HIKEY960_GIC_SOURCES}
