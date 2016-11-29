@@ -120,7 +120,19 @@ static int check_ufs(const uintptr_t spec)
 
 static int check_fip(const uintptr_t spec)
 {
-	return 0;
+	int result;
+	uintptr_t local_image_handle;
+
+	/* See if a Firmware Image Package is available */
+	result = io_dev_init(fip_dev_handle, (uintptr_t)FIP_IMAGE_ID);
+	if (result == 0) {
+		result = io_open(fip_dev_handle, spec, &local_image_handle);
+		if (result == 0) {
+			VERBOSE("Using FIP\n");
+			io_close(local_image_handle);
+		}
+	}
+	return result;
 }
 
 void hikey960_io_setup(void)
