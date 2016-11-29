@@ -29,12 +29,14 @@
  */
 
 #include <arch_helpers.h>
+#include <arm_gic.h>
 #include <assert.h>
 #include <bl_common.h>
 #include <console.h>
 #include <debug.h>
 #include <delay_timer.h>
 #include <errno.h>
+#include <gicv2.h>
 #include <hi3660.h>
 #include <mmio.h>
 #include <generic_delay_timer.h>
@@ -73,6 +75,22 @@ extern unsigned long __COHERENT_RAM_END__;
 
 /* Data structure which holds the extents of the trusted RAM for BL1 */
 static meminfo_t bl1_tzram_layout;
+
+/******************************************************************************
+ * On a GICv2 system, the Group 1 secure interrupts are treated as Group 0
+ * interrupts.
+ *****************************************************************************/
+const unsigned int g0_interrupt_array[] = {
+	IRQ_SEC_PHY_TIMER,
+	IRQ_SEC_SGI_0
+};
+
+const gicv2_driver_data_t hikey960_gic_data = {
+	.gicd_base = GICD_REG_BASE,
+	.gicc_base = GICC_REG_BASE,
+	.g0_interrupt_num = ARRAY_SIZE(g0_interrupt_array),
+	.g0_interrupt_array = g0_interrupt_array,
+};
 
 meminfo_t *bl1_plat_sec_mem_layout(void)
 {
@@ -216,6 +234,11 @@ void bl1_plat_set_ep_info(unsigned int image_id,
 
 	if (image_id == BL2_IMAGE_ID)
 		return;
+	/* Initialize the GIC driver, cpu and distributor interfaces */
+	gicv2_driver_init(&hikey960_gic_data);
+	gicv2_distif_init();
+	gicv2_pcpu_distif_init();
+	gicv2_cpuif_enable();
 	/* CNTFRQ is read-only in EL1 */
 	write_cntfrq_el0(plat_get_syscnt_freq2());
 	__asm__ volatile ("mrs	%0, cpacr_el1" : "=r"(data));

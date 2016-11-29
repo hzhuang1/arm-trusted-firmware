@@ -52,6 +52,11 @@ PLAT_BL_COMMON_SOURCES	:=	drivers/arm/pl011/pl011_console.S	\
 				plat/common/aarch64/plat_common.c	\
 				plat/hisilicon/hikey960/aarch64/hikey960_common.c
 
+HIKEY960_GIC_SOURCES	:=	drivers/arm/gic/common/gic_common.c	\
+				drivers/arm/gic/v2/gicv2_main.c		\
+				drivers/arm/gic/v2/gicv2_helpers.c	\
+				plat/common/plat_gicv2.c
+
 BL1_SOURCES		+=	bl1/tbbr/tbbr_img_desc.c		\
 				drivers/delay_timer/delay_timer.c	\
 				drivers/delay_timer/generic_delay_timer.c \
@@ -63,7 +68,8 @@ BL1_SOURCES		+=	bl1/tbbr/tbbr_img_desc.c		\
 				plat/common/aarch64/platform_up_stack.S	\
 				plat/hisilicon/hikey960/aarch64/hikey960_helpers.S \
 				plat/hisilicon/hikey960/hikey960_bl1_setup.c 	\
-				plat/hisilicon/hikey960/hikey960_io_storage.c
+				plat/hisilicon/hikey960/hikey960_io_storage.c \
+				${HIKEY960_GIC_SOURCES}
 
 BL2_SOURCES		+=	drivers/delay_timer/delay_timer.c	\
 				drivers/delay_timer/generic_delay_timer.c \
@@ -74,11 +80,6 @@ BL2_SOURCES		+=	drivers/delay_timer/delay_timer.c	\
 				plat/common/aarch64/platform_up_stack.S	\
 				plat/hisilicon/hikey960/hikey960_bl2_setup.c \
 				plat/hisilicon/hikey960/hikey960_io_storage.c
-
-HIKEY960_GIC_SOURCES	:=	drivers/arm/gic/common/gic_common.c	\
-				drivers/arm/gic/v2/gicv2_main.c		\
-				drivers/arm/gic/v2/gicv2_helpers.c	\
-				plat/common/plat_gicv2.c
 
 BL31_SOURCES		+=	drivers/arm/cci/cci.c			\
 				lib/cpus/aarch64/cortex_a53.S           \
