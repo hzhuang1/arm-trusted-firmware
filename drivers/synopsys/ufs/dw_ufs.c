@@ -29,6 +29,7 @@
  */
 
 #include <assert.h>
+#include <debug.h>
 #include <dw_ufs.h>
 #include <mmio.h>
 #include <stdint.h>
@@ -37,9 +38,9 @@
 
 static int dwufs_phy_init(ufs_params_t *params)
 {
-	uic_cmd_t cmd;
 	uintptr_t base;
-	unsigned int tx0, tx1;
+	unsigned int fsm0, fsm1;
+	unsigned int data;
 	int result;
 
 	assert((params != NULL) && 		\
@@ -47,149 +48,76 @@ static int dwufs_phy_init(ufs_params_t *params)
 
 	base = params->reg_base;
 
-	ufshc_dme_set(VS_MPHY_DISABLE, 0, 1);
-	ufshc_dme_set(PA_HSSERIES, 0, 2);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x81140000;
-	cmd.arg3 = 1;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x81210000;
-	cmd.arg3 = 0x2d;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x81220000;
-	cmd.arg3 = 0x1;
-	ufshc_send_uic_cmd(base, &cmd);
-	ufshc_dme_set(VS_MPHY_CFG_UPDT, 0, 1);
+	/* Unipro VS_MPHY disable */
+	ufshc_dme_set(VS_MPHY_DISABLE_OFFSET, 0, VS_MPHY_DISABLE_MPHYDIS);
+	ufshc_dme_set(PA_HSSERIES_OFFSET, 0, 2);
+	/* MPHY CBRATESEL */
+	ufshc_dme_set(0x8114, 0, 1);
+	/* MPHY CBOVRCTRL2 */
+	ufshc_dme_set(0x8121, 0, 0x2d);
+	/* MPHY CBOVRCTRL3 */
+	ufshc_dme_set(0x8122, 0, 0x1);
+	ufshc_dme_set(VS_MPHY_CFG_UPDT_OFFSET, 0, 1);
 
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x800d0004;
-	cmd.arg3 = 0x58;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x800d0005;
-	cmd.arg3 = 0x58;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x800e0004;
-	cmd.arg3 = 0xb;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x800e0005;
-	cmd.arg3 = 0xb;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x80090004;
-	cmd.arg3 = 0x1;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x80090005;
-	cmd.arg3 = 0x1;
-	ufshc_send_uic_cmd(base, &cmd);
-	ufshc_dme_set(VS_MPHY_CFG_UPDT, 0, 1);
+	/* MPHY RXOVRCTRL4 rx0 */
+	ufshc_dme_set(0x800d, 4, 0x58);
+	/* MPHY RXOVRCTRL4 rx1 */
+	ufshc_dme_set(0x800d, 5, 0x58);
+	/* MPHY RXOVRCTRL5 rx0 */
+	ufshc_dme_set(0x800e, 4, 0xb);
+	/* MPHY RXOVRCTRL5 rx1 */
+	ufshc_dme_set(0x800e, 5, 0xb);
+	/* MPHY RXSQCONTROL rx0 */
+	ufshc_dme_set(0x8009, 4, 0x1);
+	/* MPHY RXSQCONTROL rx1 */
+	ufshc_dme_set(0x8009, 5, 0x1);
+	ufshc_dme_set(VS_MPHY_CFG_UPDT_OFFSET, 0, 1);
 
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x81130000;
-	cmd.arg3 = 0x1;
-	ufshc_send_uic_cmd(base, &cmd);
-	ufshc_dme_set(VS_MPHY_CFG_UPDT, 0, 1);
+	ufshc_dme_set(0x8113, 0, 0x1);
+	ufshc_dme_set(VS_MPHY_CFG_UPDT_OFFSET, 0, 1);
 
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x00950004;
-	cmd.arg3 = 0x4a;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x00950005;
-	cmd.arg3 = 0x4a;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x00940004;
-	cmd.arg3 = 0x4a;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x00940005;
-	cmd.arg3 = 0x4a;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x008f0004;
-	cmd.arg3 = 0x7;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x008f0005;
-	cmd.arg3 = 0x7;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x000f0000;
-	cmd.arg3 = 0x5;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x000f0001;
-	cmd.arg3 = 0x5;
-	ufshc_send_uic_cmd(base, &cmd);
-	ufshc_dme_set(VS_MPHY_CFG_UPDT, 0, 1);
+	ufshc_dme_set(RX_HS_G3_SYNC_LENGTH_CAP_OFFSET, 4, 0x4a);
+	ufshc_dme_set(RX_HS_G3_SYNC_LENGTH_CAP_OFFSET, 5, 0x4a);
+	ufshc_dme_set(RX_HS_G2_SYNC_LENGTH_CAP_OFFSET, 4, 0x4a);
+	ufshc_dme_set(RX_HS_G2_SYNC_LENGTH_CAP_OFFSET, 5, 0x4a);
+	ufshc_dme_set(RX_MIN_ACTIVATETIME_CAP_OFFSET, 4, 0x7);
+	ufshc_dme_set(RX_MIN_ACTIVATETIME_CAP_OFFSET, 5, 0x7);
+	ufshc_dme_set(TX_HIBERN8TIME_CAP_OFFSET, 0, 0x5);
+	ufshc_dme_set(TX_HIBERN8TIME_CAP_OFFSET, 1, 0x5);
+	ufshc_dme_set(VS_MPHY_CFG_UPDT_OFFSET, 0, 1);
 
-	/* FIXME: uic cmd read */
+	result = ufshc_dme_get(VS_MPHY_DISABLE_OFFSET, 0, &data);
+	assert((result == 0) && (data == VS_MPHY_DISABLE_MPHYDIS));
+	/* enable Unipro VS MPHY */
+	ufshc_dme_set(VS_MPHY_DISABLE_OFFSET, 0, 0);
 
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = (VS_MPHY_DISABLE << 16);
-	cmd.arg3 = 0x0;
-	ufshc_send_uic_cmd(base, &cmd);
-
-	do {
-		result = ufshc_dme_get(0x41, 0, &tx0);
+	while (1) {
+		result = ufshc_dme_get(TX_FSM_STATE_OFFSET, 0, &fsm0);
 		assert(result == 0);
-		result = ufshc_dme_get(0x41, 1, &tx1);
+		result = ufshc_dme_get(TX_FSM_STATE_OFFSET, 1, &fsm1);
 		assert(result == 0);
-	} while ((tx0 != 1) || (tx1 != 1));
+		if ((fsm0 == TX_FSM_STATE_HIBERN8) &&
+		    (fsm1 == TX_FSM_STATE_HIBERN8))
+			break;
+	}
 
 	mmio_write_32(base + HCLKDIV, 0xE4);
 	mmio_clrbits_32(base + AHIT, 0x3FF);
 
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0x155e0000;
-	ufshc_send_uic_cmd(base, &cmd);
-	memset(&cmd, 0, sizeof(cmd));
-	cmd.op = DME_SET;
-	cmd.arg1 = 0xd0ab0000;
-	ufshc_send_uic_cmd(base, &cmd);
-	return 0;
-}
+	ufshc_dme_set(PA_LOCAL_TX_LCC_ENABLE_OFFSET, 0, 0);
+	ufshc_dme_set(VS_MK2_EXTN_SUPPORT_OFFSET, 0, 0);
 
-static int dwufs_hc_init(ufs_params_t *params)
-{
-	assert((params != NULL) && 		\
-	       (params->reg_base != 0));
+	result = ufshc_dme_get(VS_MK2_EXTN_SUPPORT_OFFSET, 0, &data);
+	assert((result == 0) && (data == 0));
 
-	ufshc_dme_set(0x2044, 0, 0);
-	ufshc_dme_set(0x2045, 0, 0);
-	ufshc_dme_set(0x2040, 0, 9);
+	ufshc_dme_set(DL_AFC0_CREDIT_THRESHOLD_OFFSET, 0, 0);
+	ufshc_dme_set(DL_TC0_OUT_ACK_THRESHOLD_OFFSET, 0, 0);
+	ufshc_dme_set(DL_TC0_TX_FC_THRESHOLD_OFFSET, 0, 9);
 	return 0;
 }
 
 const ufs_ops_t dw_ufs_ops = {
 	.phy_init 	= dwufs_phy_init,
-	.hc_init 	= dwufs_hc_init,
 };
 
 int dw_ufs_init(dw_ufs_params_t *params)
