@@ -86,6 +86,7 @@
 #define PERI_TIMER9_BIT 		(1 << 22)
 #define PERI_UART5_BIT 			(1 << 15)
 #define PERI_UFS_BIT 			(1 << 12)
+#define PERI_ARST_UFS_BIT		(1 << 7)
 #define PERI_PPLL2_EN_CPU 		(1 << 3)
 #define PERI_PWM_BIT 			(1 << 0)
 #define PERI_DDRC_BIT 			(1 << 0)
@@ -116,7 +117,12 @@
 #define CRG_CLKDIV16_OFFSET 		0x0E8
 #define DDRC_CLK_SW_REQ_CFG_MASK 	(0x3 << 12)
 #define DDRC_CLK_SW_REQ_CFG(x) 		(((x) & 0x3) << 12)
+#define SC_DIV_UFSPHY_CFG_MASK		(0x3 << 9)
+#define SC_DIV_UFSPHY_CFG(x)		(((x) & 0x3) << 9)
 #define DDRCPLL_SW 			(1 << 8)
+
+#define CRG_CLKDIV17_OFFSET		0x0EC
+#define SC_DIV_UFS_PERIBUS		(1 << 14)
 
 #define CRG_CLKDIV20_OFFSET 		0x0F8
 #define CLKDIV20_GT_CLK_AOMM 		(1 << 3)
