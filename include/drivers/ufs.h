@@ -192,6 +192,8 @@
 
 #define GEN_SELECTOR_IDX(x) 		((x) & 0xFFFF)
 
+#define CONFIG_RESULT_CODE_MASK		0xFF
+
 #define CDBCMD_TEST_UNIT_READY 		0x00
 #define CDBCMD_READ_6 			0x08
 #define CDBCMD_WRITE_6 			0x0A
@@ -483,7 +485,6 @@ typedef struct ufs_params {
 
 typedef struct ufs_ops {
 	int 		(*phy_init)(ufs_params_t *params);
-	int 		(*hc_init)(ufs_params_t *params);
 } ufs_ops_t;
 
 int ufshc_send_uic_cmd(uintptr_t base, uic_cmd_t *cmd);

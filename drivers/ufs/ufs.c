@@ -69,7 +69,7 @@ int ufshc_send_uic_cmd(uintptr_t base, uic_cmd_t *cmd)
 		data = mmio_read_32(base + IS);
 	} while ((data & UFS_INT_UCCS) == 0);
 	mmio_write_32(base + IS, UFS_INT_UCCS);
-	return 0;
+	return mmio_read_32(base + UCMDARG2) && CONFIG_RESULT_CODE_MASK;
 }
 
 int ufshc_dme_get(unsigned int attr, unsigned int idx, unsigned int *val)
@@ -102,6 +102,8 @@ int ufshc_dme_get(unsigned int attr, unsigned int idx, unsigned int *val)
 			return -EINVAL;
 	} while ((data & UFS_INT_UCCS) == 0);
 	mmio_write_32(base + IS, UFS_INT_UCCS);
+	data = mmio_read_32(base + UCMDARG2) && CONFIG_RESULT_CODE_MASK;
+	assert(data == 0);
 
 	*val = mmio_read_32(base + UCMDARG3);
 	return 0;
@@ -129,6 +131,8 @@ int ufshc_dme_set(unsigned int attr, unsigned int idx, unsigned int val)
 			return -EINVAL;
 	} while ((data & UFS_INT_UCCS) == 0);
 	mmio_write_32(base + IS, UFS_INT_UCCS);
+	data = mmio_read_32(base + UCMDARG2) && CONFIG_RESULT_CODE_MASK;
+	assert(data == 0);
 	return 0;
 }
 
@@ -161,14 +165,13 @@ static int ufshc_link_startup(uintptr_t base)
 		result = ufshc_send_uic_cmd(base, &cmd);
 		if (result != 0)
 			continue;
-		while ((mmio_read_32(base + HCS) & HCS_DP) == 0) {
-			data = mmio_read_32(base + IS);
-			if (data & UFS_INT_ULSS) 	/* retry */
-				break;
-		}
+		while ((mmio_read_32(base + HCS) & HCS_DP) == 0);
+		data = mmio_read_32(base + IS);
+		if (data & UFS_INT_ULSS)
+			mmio_write_32(base + IS, UFS_INT_ULSS);
+		return 0;
 	}
-	assert(retries >= 0);
-	return 0;
+	return -EIO;
 }
 
 /* Check Door Bell register to get an empty slot */
@@ -656,6 +659,7 @@ static void ufs_enum(void)
 	ufs_verify_ready();
 
 	ufs_set_flag(FLAG_DEVICE_INIT);
+	mdelay(100);
 	dump_all_lun((uintptr_t)buf, UNIT_DESCRIPTOR_LEN);
 }
 
@@ -697,17 +701,12 @@ int ufs_init(const ufs_ops_t *ops, ufs_params_t *params)
 		assert(result == 0);
 		assert((data > 0) && (data <= 3));
 	} else {
-		assert((ops != NULL) && 			\
-		       (ops->phy_init != NULL) && 		\
-		       (ops->hc_init != NULL));
+		assert((ops != NULL) && (ops->phy_init != NULL));
 
 		ufshc_reset(ufs_params.reg_base);
-		ops->phy_init(params);
+		ops->phy_init(&ufs_params);
 		result = ufshc_link_startup(ufs_params.reg_base);
 		assert(result == 0);
-
-		ops->hc_init(params);
-		mdelay(10);
 	}
 
 	ufs_enum();
