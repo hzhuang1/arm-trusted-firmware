@@ -35,6 +35,7 @@
 #include <console.h>
 #include <debug.h>
 #include <delay_timer.h>
+#include <dw_ufs.h>
 #include <errno.h>
 #include <gicv2.h>
 #include <hi3660.h>
@@ -150,16 +151,70 @@ static void hikey960_pmu_init(void)
 			NP_XO_ABB_DIG);
 }
 
+static void hikey960_ufs_reset(void)
+{
+	unsigned int data, mask;
+
+	mmio_write_32(CRG_REG_BASE + CRG_PERRSTEN3_OFFSET, PERI_UFS_BIT);
+	do {
+		data = mmio_read_32(CRG_REG_BASE + CRG_PERRSTSTAT3_OFFSET);
+	} while ((data & PERI_UFS_BIT) == 0);
+	mmio_setbits_32(UFS_SYS_REG_BASE + UFS_SYS_PSW_POWER_CTRL_OFFSET,
+			BIT_UFS_PSW_MTCMOS_EN);
+	mdelay(1);
+	mmio_setbits_32(UFS_SYS_REG_BASE + UFS_SYS_HC_LP_CTRL_OFFSET,
+			BIT_SYSCTRL_PWR_READY);
+	mmio_write_32(UFS_SYS_REG_BASE + UFS_SYS_UFS_DEVICE_RESET_CTRL_OFFSET,
+		      MASK_UFS_DEVICE_RESET);
+	mask = SC_DIV_UFS_PERIBUS << 16;
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV17_OFFSET, mask);
+	mask = SC_DIV_UFSPHY_CFG_MASK << 16;
+	data = SC_DIV_UFSPHY_CFG(3);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV16_OFFSET, mask | data);
+	data = mmio_read_32(UFS_SYS_REG_BASE + UFS_SYS_PHY_CLK_CTRL_OFFSET);
+	data &= ~MASK_SYSCTRL_CFG_CLOCK_FREQ;
+	data |= 0x39;
+	mmio_write_32(UFS_SYS_REG_BASE + UFS_SYS_PHY_CLK_CTRL_OFFSET, data);
+	mmio_clrbits_32(UFS_SYS_REG_BASE + UFS_SYS_PHY_CLK_CTRL_OFFSET,
+			MASK_SYSCTRL_REF_CLOCK_SEL);
+
+	mmio_setbits_32(UFS_SYS_REG_BASE + UFS_SYS_PSW_CLK_CTRL_OFFSET,
+			BIT_SYSCTRL_PSW_CLK_EN);
+	mmio_clrbits_32(UFS_SYS_REG_BASE + UFS_SYS_PSW_POWER_CTRL_OFFSET,
+			BIT_UFS_PSW_ISO_CTRL);
+	mmio_clrbits_32(UFS_SYS_REG_BASE + UFS_SYS_PHY_ISO_EN_OFFSET,
+			BIT_UFS_PHY_ISO_CTRL);
+	mmio_clrbits_32(UFS_SYS_REG_BASE + UFS_SYS_HC_LP_CTRL_OFFSET,
+			BIT_SYSCTRL_LP_ISOL_EN);
+	mmio_write_32(CRG_REG_BASE + CRG_PERRSTDIS3_OFFSET, PERI_ARST_UFS_BIT);
+	mmio_setbits_32(UFS_SYS_REG_BASE + UFS_SYS_RESET_CTRL_EN_OFFSET,
+			BIT_SYSCTRL_LP_RESET_N);
+	mdelay(1);
+	mmio_write_32(UFS_SYS_REG_BASE + UFS_SYS_UFS_DEVICE_RESET_CTRL_OFFSET,
+		      MASK_UFS_DEVICE_RESET | BIT_UFS_DEVICE_RESET);
+	mdelay(20);
+	mmio_write_32(UFS_SYS_REG_BASE + UFS_SYS_UFS_DEVICE_RESET_CTRL_OFFSET,
+		      0x03300330);
+
+	mmio_write_32(CRG_REG_BASE + CRG_PERRSTDIS3_OFFSET, PERI_UFS_BIT);
+	do {
+		data = mmio_read_32(CRG_REG_BASE + CRG_PERRSTSTAT3_OFFSET);
+	} while (data & PERI_UFS_BIT);
+}
+
 static void hikey960_ufs_init(void)
 {
-	ufs_params_t ufs_params;
+	dw_ufs_params_t ufs_params;
 
 	memset(&ufs_params, 0, sizeof(ufs_params));
 	ufs_params.reg_base = UFS_REG_BASE;
 	ufs_params.desc_base = HIKEY960_UFS_DESC_BASE;
 	ufs_params.desc_size = HIKEY960_UFS_DESC_SIZE;
-	ufs_params.flags = UFS_FLAGS_SKIPINIT;
-	ufs_init(NULL, &ufs_params);
+	//ufs_params.flags = UFS_FLAGS_SKIPINIT;
+
+	if ((ufs_params.flags & UFS_FLAGS_SKIPINIT) == 0)
+		hikey960_ufs_reset();
+	dw_ufs_init(&ufs_params);
 }
 
 static void hikey960_tzc_init(void)

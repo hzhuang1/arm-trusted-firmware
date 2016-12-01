@@ -63,6 +63,7 @@ BL1_SOURCES		+=	bl1/tbbr/tbbr_img_desc.c		\
 				drivers/io/io_block.c			\
 				drivers/io/io_fip.c			\
 				drivers/io/io_storage.c			\
+				drivers/synopsys/ufs/dw_ufs.c		\
 				drivers/ufs/ufs.c 			\
 				lib/cpus/aarch64/cortex_a53.S		\
 				plat/common/aarch64/platform_up_stack.S	\
