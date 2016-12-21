@@ -35,6 +35,7 @@
 #include <endian.h>
 #include <errno.h>
 #include <mmio.h>
+#include <platform_def.h>
 #include <stdint.h>
 #include <string.h>
 #include <ufs.h>
@@ -267,6 +268,7 @@ static int ufs_prepare_cmd(utp_utrd_t *utrd, uint8_t op, uint8_t lun,
 		while (length > 0) {
 			prdt->dba = (unsigned int)(buf & UINT32_MAX);
 			prdt->dbau = (unsigned int)((buf >> 32) & UINT32_MAX);
+			/* prdt->dbc counts from 0 */
 			if (length > MAX_PRDT_SIZE) {
 				prdt->dbc = MAX_PRDT_SIZE - 1;
 				length = length - MAX_PRDT_SIZE;
@@ -289,6 +291,7 @@ static int ufs_prepare_cmd(utp_utrd_t *utrd, uint8_t op, uint8_t lun,
 	case CDBCMD_READ_CAPACITY_10:
 		hd->dd = DD_OUT;
 		upiu->flags = UPIU_FLAGS_R | UPIU_FLAGS_ATTR_S;
+		upiu->lun = lun;
 		break;
 	case CDBCMD_READ_10:
 		hd->dd = DD_OUT;
@@ -460,15 +463,20 @@ static void dump_upiu(utp_utrd_t *utrd)
 			*(unsigned int *)((uintptr_t)utrd->header + i));
 	}
 
-	for (i = 0; i < utrd->size_upiu; i += 4) {
+	for (i = 0; i < sizeof(cmd_upiu_t); i += 4) {
 		INFO("cmd[%lx]:0x%x\n",
 			utrd->upiu + i,
 			*(unsigned int *)(utrd->upiu + i));
 	}
-	for (i = 0; i < utrd->size_resp_upiu; i += 4) {
+	for (i = 0; i < sizeof(resp_upiu_t); i += 4) {
 		INFO("resp[%lx]:0x%x\n",
 			utrd->resp_upiu + i,
 			*(unsigned int *)(utrd->resp_upiu + i));
+	}
+	for (i = 0; i < sizeof(prdt_t); i += 4) {
+		INFO("prdt[%lx]:0x%x\n",
+			utrd->prdt + i,
+			*(unsigned int *)(utrd->prdt + i));
 	}
 }
 #endif
@@ -584,6 +592,58 @@ void ufs_write_desc(int idn, int index, uintptr_t buf, size_t size)
 	ufs_query(QUERY_WRITE_DESC, idn, index, 0, buf, size);
 }
 
+void ufs_read_capacity(int lun, unsigned int *num, unsigned int *size)
+{
+	utp_utrd_t utrd;
+	resp_upiu_t *resp;
+	sense_data_t *sense;
+	unsigned char data[CACHE_WRITEBACK_GRANULE << 1];
+	uintptr_t buf;
+	int result;
+	int retry;
+
+	assert((ufs_params.reg_base != 0) && 			\
+	       (ufs_params.desc_base != 0) && 			\
+	       (ufs_params.desc_size >= UFS_DESC_SIZE) &&	\
+	       (num != NULL) &&					\
+	       (size != NULL));
+
+	/* align buf address */
+	buf = (uintptr_t)data;
+	buf = (buf + CACHE_WRITEBACK_GRANULE - 1) &
+	      ~(CACHE_WRITEBACK_GRANULE - 1);
+	memset((void *)buf, 0, CACHE_WRITEBACK_GRANULE);
+	flush_dcache_range(buf, CACHE_WRITEBACK_GRANULE);
+	do {
+		get_utrd(&utrd);
+		ufs_prepare_cmd(&utrd, CDBCMD_READ_CAPACITY_10, lun, 0,
+				buf, READ_CAPACITY_LENGTH);
+		ufs_send_request(utrd.task_tag);
+		result = ufs_check_resp(&utrd, RESPONSE_UPIU);
+		assert(result == 0);
+#ifdef UFS_RESP_DEBUG
+		dump_upiu(&utrd);
+#endif
+		resp = (resp_upiu_t *)utrd.resp_upiu;
+		retry = 0;
+		sense = &resp->sd.sense;
+		if (sense->resp_code == SENSE_DATA_VALID) {
+			if ((sense->sense_key == SENSE_KEY_UNIT_ATTENTION) &&
+			    (sense->asc == 0x29) && (sense->ascq == 0)) {
+				retry = 1;
+			}
+		}
+		inv_dcache_range(buf, CACHE_WRITEBACK_GRANULE);
+		/* last logical block address */
+		*num = be32toh(*(unsigned int *)buf);
+		if (*num)
+			*num += 1;
+		/* logical block length in bytes */
+		*size = be32toh(*(unsigned int *)(buf + 4));
+	} while (retry);
+	(void)result;
+}
+
 size_t ufs_read_blocks(int lun, int lba, uintptr_t buf, size_t size)
 {
 	utp_utrd_t utrd;
@@ -632,23 +692,10 @@ size_t ufs_write_blocks(int lun, int lba, const uintptr_t buf, size_t size)
 	return size - resp->res_trans_cnt;
 }
 
-static void dump_all_lun(uintptr_t buf, size_t size)
-{
-	uint64_t blks;
-	int i;
-
-	for (i = 0; i < UFS_MAX_LUNS; i++) {
-		ufs_read_desc(DESC_TYPE_UNIT, i, buf, size);
-		/* get physical block counts */
-		blks = be64toh(*(uint64_t *)(buf + 0x18));
-		if (blks)
-			INFO("LUN%d blocks:0x%lx\n", i, blks);
-	}
-}
-
 static void ufs_enum(void)
 {
-	unsigned char buf[UNIT_DESCRIPTOR_LEN];
+	unsigned int blk_num, blk_size;
+	int i;
 
 	/* 0 means 1 slot */
 	nutrs = (mmio_read_32(ufs_params.reg_base + CAP) & CAP_NUTRS_MASK) + 1;
@@ -660,7 +707,14 @@ static void ufs_enum(void)
 
 	ufs_set_flag(FLAG_DEVICE_INIT);
 	mdelay(100);
-	dump_all_lun((uintptr_t)buf, UNIT_DESCRIPTOR_LEN);
+	/* dump available LUNs */
+	for (i = 0; i < UFS_MAX_LUNS; i++) {
+		ufs_read_capacity(i, &blk_num, &blk_size);
+		if (blk_num && blk_size) {
+			INFO("UFS LUN%d contains %d blocks with %d-byte size\n",
+			     i, blk_num, blk_size);
+		}
+	}
 }
 
 int ufs_init(const ufs_ops_t *ops, ufs_params_t *params)

@@ -248,10 +248,51 @@
 #define QUERY_RESP_OPCODE 		0xFE
 #define QUERY_RESP_GENERAL_FAIL 	0xFF
 
+#define SENSE_KEY_NO_SENSE		0x00
+#define SENSE_KEY_RECOVERED_ERROR	0x01
+#define SENSE_KEY_NOT_READY		0x02
+#define SENSE_KEY_MEDIUM_ERROR		0x03
+#define SENSE_KEY_HARDWARE_ERROR	0x04
+#define SENSE_KEY_ILLEGAL_REQUEST	0x05
+#define SENSE_KEY_UNIT_ATTENTION	0x06
+#define SENSE_KEY_DATA_PROTECT		0x07
+#define SENSE_KEY_BLANK_CHECK		0x08
+#define SENSE_KEY_VENDOR_SPECIFIC	0x09
+#define SENSE_KEY_COPY_ABORTED		0x0A
+#define SENSE_KEY_ABORTED_COMMAND	0x0B
+#define SENSE_KEY_VOLUME_OVERFLOW	0x0D
+#define SENSE_KEY_MISCOMPARE		0x0E
+
+#define SENSE_DATA_VALID		0x70
+#define SENSE_DATA_LENGTH		18
+
+#define READ_CAPACITY_LENGTH		8
+
 #define FLAG_DEVICE_INIT 		0x01
 
 /* UFS Driver Flags */
 #define UFS_FLAGS_SKIPINIT 		(1 << 0)
+
+typedef struct sense_data {
+	uint8_t		resp_code : 7;
+	uint8_t		valid : 1;
+	uint8_t		reserved0;
+	uint8_t		sense_key : 4;
+	uint8_t		reserved1 : 1;
+	uint8_t		ili : 1;
+	uint8_t		eom : 1;
+	uint8_t		file_mark : 1;
+	uint8_t		info[4];
+	uint8_t		asl;
+	uint8_t		cmd_spec_len[4];
+	uint8_t		asc;
+	uint8_t		ascq;
+	uint8_t		fruc;
+	uint8_t		sense_key_spec0 : 7;
+	uint8_t		sksv : 1;
+	uint8_t		sense_key_spec1;
+	uint8_t		sense_key_spec2;
+} sense_data_t;
 
 /* UTP Transfer Request Descriptor */
 typedef struct utrd_header {
@@ -422,7 +463,7 @@ typedef struct query_resp_upiu {
 		query_attr_t 	attr;
 	} ts;
 	uint32_t 	reserved3;
-} query_resp_upiu_t; 	/* 32 bytes with big endian */
+} query_resp_upiu_t;	/* 32 bytes with big endian */
 
 /* Response UPIU */
 typedef struct resp_upiu {
@@ -438,7 +479,13 @@ typedef struct resp_upiu {
 	uint8_t 	dev_info;
 	uint16_t 	data_segment_len;
 	uint32_t 	res_trans_cnt; 	/* Residual Transfer Count */
-} resp_upiu_t; 	/* 32 bytes with big endian */
+	uint32_t	reserved2[4];
+	uint16_t	sense_data_len;
+	union {
+		uint8_t		sense_data[18];
+		sense_data_t	sense;
+	} sd;
+} resp_upiu_t;		/* 52 bytes with big endian */
 
 typedef struct cmd_info {
 	uintptr_t 	buf;
