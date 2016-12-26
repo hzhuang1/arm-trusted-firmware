@@ -42,6 +42,7 @@
 
 #define CDB_ADDR_MASK 			127
 #define ALIGN_CDB(x) 			(((x) + CDB_ADDR_MASK) & ~CDB_ADDR_MASK)
+#define ALIGN_8(x)			(((x) + 7) & ~7)
 
 #define UFS_DESC_SIZE 			0x400
 #define MAX_UFS_DESC_SIZE 		0x8000 		/* 32 descriptors */
@@ -213,10 +214,10 @@ static void get_utrd(utp_utrd_t *utrd)
 	utrd->task_tag = slot + 1;
 	/* CDB address should be aligned with 128 bytes */
 	utrd->upiu = ALIGN_CDB(utrd->header + sizeof(utrd_header_t));
-	utrd->resp_upiu = ALIGN_CDB(utrd->upiu + sizeof(cmd_upiu_t));
+	utrd->resp_upiu = ALIGN_8(utrd->upiu + sizeof(cmd_upiu_t));
 	utrd->size_upiu = utrd->resp_upiu - utrd->upiu;
-	utrd->size_resp_upiu = ALIGN_CDB(sizeof(resp_upiu_t));
-	assert(utrd->size_upiu == (CDB_ADDR_MASK + 1));
+	utrd->size_resp_upiu = ALIGN_8(sizeof(resp_upiu_t));
+	//assert(utrd->size_upiu == (CDB_ADDR_MASK + 1));
 	utrd->prdt = utrd->resp_upiu + utrd->size_resp_upiu;
 
 	hd = (utrd_header_t *)utrd->header;
@@ -280,7 +281,7 @@ static int ufs_prepare_cmd(utp_utrd_t *utrd, uint8_t op, uint8_t lun,
 			prdt++;
 			prdt_size += sizeof(prdt_t);
 		}
-		utrd->size_prdt = ALIGN_CDB(prdt_size);
+		utrd->size_prdt = ALIGN_8(prdt_size);
 		hd->prdtl = utrd->size_prdt >> 2;
 		hd->prdto = (utrd->size_upiu + utrd->size_resp_upiu) >> 2;
 	}
