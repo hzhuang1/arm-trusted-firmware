@@ -390,7 +390,7 @@ typedef struct cmd_upiu {
 	 * of between 12 and 260 bytes
 	 */
 	uint8_t 	cdb[16]; 	/* little endian */
-} cmd_upiu_t; 	/* 36 bytes with big endian except for cdb[] */
+} cmd_upiu_t; 	/* 32 bytes with big endian except for cdb[] */
 
 typedef struct query_desc {
 	uint8_t 	opcode;
@@ -442,7 +442,7 @@ typedef struct query_upiu {
 		query_attr_t 	attr;
 	} ts;
 	uint32_t 	reserved5;
-} query_upiu_t; /* 36 bytes with big endian */
+} query_upiu_t; /* 32 bytes with big endian */
 
 /* Query Response UPIU */
 typedef struct query_resp_upiu {
