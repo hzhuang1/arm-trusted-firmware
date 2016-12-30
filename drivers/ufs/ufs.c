@@ -260,32 +260,6 @@ static int ufs_prepare_cmd(utp_utrd_t *utrd, uint8_t op, uint8_t lun,
 	upiu->cdb[0] = op;
 	ulba = (unsigned int)lba;
 	lba_cnt = (unsigned int)(length >> UFS_BLOCK_SHIFT);
-	if (length) {
-		upiu->exp_data_trans_len = htobe32(length);
-		assert(lba_cnt <= UINT16_MAX);
-		prdt = (prdt_t *)utrd->prdt;
-
-		prdt_size = 0;
-		while (length > 0) {
-			prdt->dba = (unsigned int)(buf & UINT32_MAX);
-			prdt->dbau = (unsigned int)((buf >> 32) & UINT32_MAX);
-			/* prdt->dbc counts from 0 */
-			if (length > MAX_PRDT_SIZE) {
-				prdt->dbc = MAX_PRDT_SIZE - 1;
-				length = length - MAX_PRDT_SIZE;
-			} else {
-				prdt->dbc = length - 1;
-				length = 0;
-			}
-			buf += MAX_PRDT_SIZE;
-			prdt++;
-			prdt_size += sizeof(prdt_t);
-		}
-		utrd->size_prdt = ALIGN_8(prdt_size);
-		hd->prdtl = utrd->size_prdt >> 2;
-		hd->prdto = (utrd->size_upiu + utrd->size_resp_upiu) >> 2;
-	}
-
 	switch (op) {
 	case CDBCMD_TEST_UNIT_READY:
 		break;
@@ -324,6 +298,39 @@ static int ufs_prepare_cmd(utp_utrd_t *utrd, uint8_t op, uint8_t lun,
 	default:
 		assert(0);
 	}
+	if (hd->dd == DD_IN) {
+		flush_dcache_range(buf, length);
+	} else if (hd->dd == DD_OUT) {
+		inv_dcache_range(buf, length);
+	}
+	if (length) {
+		upiu->exp_data_trans_len = htobe32(length);
+		assert(lba_cnt <= UINT16_MAX);
+		prdt = (prdt_t *)utrd->prdt;
+
+		prdt_size = 0;
+		while (length > 0) {
+			prdt->dba = (unsigned int)(buf & UINT32_MAX);
+			prdt->dbau = (unsigned int)((buf >> 32) & UINT32_MAX);
+			/* prdt->dbc counts from 0 */
+			if (length > MAX_PRDT_SIZE) {
+				prdt->dbc = MAX_PRDT_SIZE - 1;
+				length = length - MAX_PRDT_SIZE;
+			} else {
+				prdt->dbc = length - 1;
+				length = 0;
+			}
+			buf += MAX_PRDT_SIZE;
+			prdt++;
+			prdt_size += sizeof(prdt_t);
+		}
+		utrd->size_prdt = ALIGN_8(prdt_size);
+		hd->prdtl = utrd->size_prdt >> 2;
+		hd->prdto = (utrd->size_upiu + utrd->size_resp_upiu) >> 2;
+	}
+
+	flush_dcache_range((uintptr_t)utrd, sizeof(utp_utrd_t));
+	flush_dcache_range((uintptr_t)utrd->header, UFS_DESC_SIZE);
 	return 0;
 }
 
@@ -380,6 +387,8 @@ static int ufs_prepare_query(utp_utrd_t *utrd, uint8_t op, uint8_t idn,
 	default:
 		assert(0);
 	}
+	flush_dcache_range((uintptr_t)utrd, sizeof(utp_utrd_t));
+	flush_dcache_range((uintptr_t)utrd->header, UFS_DESC_SIZE);
 	return 0;
 }
 
@@ -402,6 +411,8 @@ static void ufs_prepare_nop_out(utp_utrd_t *utrd)
 
 	nop_out->trans_type = 0;
 	nop_out->task_tag = utrd->task_tag;
+	flush_dcache_range((uintptr_t)utrd, sizeof(utp_utrd_t));
+	flush_dcache_range((uintptr_t)utrd->header, UFS_DESC_SIZE);
 }
 
 static void ufs_send_request(int task_tag)
@@ -434,6 +445,8 @@ static int ufs_check_resp(utp_utrd_t *utrd, int trans_type)
 
 	hd = (utrd_header_t *)utrd->header;
 	resp = (resp_upiu_t *)utrd->resp_upiu;
+	inv_dcache_range((uintptr_t)hd, UFS_DESC_SIZE);
+	inv_dcache_range((uintptr_t)utrd, sizeof(utp_utrd_t));
 	do {
 		data = mmio_read_32(ufs_params.reg_base + IS);
 		if ((data & ~(UFS_INT_UCCS | UFS_INT_UTRCS)) != 0)
