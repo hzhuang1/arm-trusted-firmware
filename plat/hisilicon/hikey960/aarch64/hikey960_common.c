@@ -43,7 +43,7 @@
 
 #define MAP_DDR		MAP_REGION_FLAT(DDR_BASE,			\
 					DDR_SIZE,			\
-					MT_DEVICE | MT_RW | MT_NS)
+					MT_MEMORY | MT_RW | MT_NS)
 
 #define MAP_BL 		MAP_REGION_FLAT(BL1_RO_BASE, 			\
 					BL2_LIMIT - BL1_RO_BASE,	\
