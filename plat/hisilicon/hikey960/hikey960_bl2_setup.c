@@ -211,4 +211,11 @@ void bl2_platform_setup(void)
 	ufs_init(NULL, &ufs_params);
 
 	hikey960_io_setup();
+
+	/* disable WDT0 */
+	if (mmio_read_32(WDT0_REG_BASE + WDT_LOCK_OFFSET) == WDT_LOCKED) {
+		mmio_write_32(WDT0_REG_BASE + WDT_LOCK_OFFSET, WDT_UNLOCK);
+		mmio_write_32(WDT0_REG_BASE + WDT_CONTROL_OFFSET, 0);
+		mmio_write_32(WDT0_REG_BASE + WDT_LOCK_OFFSET, 0);
+	}
 }
