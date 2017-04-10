@@ -104,9 +104,16 @@ meminfo_t *bl1_plat_sec_mem_layout(void)
 void bl1_early_platform_setup(void)
 {
 	const size_t bl1_size = BL1_RAM_LIMIT - BL1_RAM_BASE;
+	unsigned int id, uart_base;
 
+	generic_delay_timer_init();
+	hikey960_read_boardid(&id);
+	if (id == 5300)
+		uart_base = PL011_UART5_BASE;
+	else
+		uart_base = PL011_UART6_BASE;
 	/* Initialize the console to provide early debug support */
-	console_init(CONSOLE_BASE, PL011_UART_CLK_IN_HZ, PL011_BAUDRATE);
+	console_init(uart_base, PL011_UART_CLK_IN_HZ, PL011_BAUDRATE);
 
 	/* Allow BL1 to see the whole Trusted RAM */
 	bl1_tzram_layout.total_base = BL1_RW_BASE;
@@ -593,7 +600,6 @@ void bl1_platform_setup(void)
 {
 	hikey960_clk_init();
 	hikey960_pmu_init();
-	generic_delay_timer_init();
 	hikey960_regulator_enable();
 	hikey960_tzc_init();
 	hikey960_ufs_init();

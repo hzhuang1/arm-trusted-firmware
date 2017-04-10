@@ -35,6 +35,7 @@
 #include <console.h>
 #include <debug.h>
 #include <errno.h>
+#include <generic_delay_timer.h>
 #include <gicv2.h>
 #include <hi3660.h>
 #include <platform_def.h>
@@ -100,8 +101,17 @@ entry_point_info_t *bl31_plat_get_next_image_ep_info(unsigned int type)
 void bl31_early_platform_setup(bl31_params_t *from_bl2,
 		void *plat_params_from_bl2)
 {
+	unsigned int id, uart_base;
+
+	generic_delay_timer_init();
+	hikey960_read_boardid(&id);
+	if (id == 5300)
+		uart_base = PL011_UART5_BASE;
+	else
+		uart_base = PL011_UART6_BASE;
+
 	/* Initialize the console to provide early debug support */
-	console_init(CONSOLE_BASE, PL011_UART_CLK_IN_HZ, PL011_BAUDRATE);
+	console_init(uart_base, PL011_UART_CLK_IN_HZ, PL011_BAUDRATE);
 
 	/* Initialize CCI driver */
 	cci_init(CCI400_REG_BASE, cci_map, ARRAY_SIZE(cci_map));

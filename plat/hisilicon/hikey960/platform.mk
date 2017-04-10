@@ -28,14 +28,12 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-CONSOLE_BASE			:=	PL011_UART5_BASE
 CRASH_CONSOLE_BASE		:=	PL011_UART5_BASE
 COLD_BOOT_SINGLE_CPU		:=	1
 PROGRAMMABLE_RESET_ADDRESS	:=	1
 PLAT_PARTITION_BLOCK_SIZE 	:= 	4096
 
 # Process flags
-$(eval $(call add_define,CONSOLE_BASE))
 $(eval $(call add_define,CRASH_CONSOLE_BASE))
 $(eval $(call add_define,PLAT_PARTITION_BLOCK_SIZE))
 
@@ -48,9 +46,12 @@ PLAT_INCLUDES		:=	-Iinclude/common/tbbr			\
 				-Iplat/hisilicon/hikey960/include
 
 PLAT_BL_COMMON_SOURCES	:=	drivers/arm/pl011/pl011_console.S	\
+				drivers/delay_timer/delay_timer.c	\
+				drivers/delay_timer/generic_delay_timer.c \
 				lib/aarch64/xlat_tables.c		\
 				plat/common/aarch64/plat_common.c	\
-				plat/hisilicon/hikey960/aarch64/hikey960_common.c
+				plat/hisilicon/hikey960/aarch64/hikey960_common.c \
+				plat/hisilicon/hikey960/hikey960_boardid.c
 
 HIKEY960_GIC_SOURCES	:=	drivers/arm/gic/common/gic_common.c	\
 				drivers/arm/gic/v2/gicv2_main.c		\
@@ -58,8 +59,6 @@ HIKEY960_GIC_SOURCES	:=	drivers/arm/gic/common/gic_common.c	\
 				plat/common/plat_gicv2.c
 
 BL1_SOURCES		+=	bl1/tbbr/tbbr_img_desc.c		\
-				drivers/delay_timer/delay_timer.c	\
-				drivers/delay_timer/generic_delay_timer.c \
 				drivers/io/io_block.c			\
 				drivers/io/io_fip.c			\
 				drivers/io/io_storage.c			\
@@ -72,9 +71,7 @@ BL1_SOURCES		+=	bl1/tbbr/tbbr_img_desc.c		\
 				plat/hisilicon/hikey960/hikey960_io_storage.c \
 				${HIKEY960_GIC_SOURCES}
 
-BL2_SOURCES		+=	drivers/delay_timer/delay_timer.c	\
-				drivers/delay_timer/generic_delay_timer.c \
-				drivers/io/io_block.c			\
+BL2_SOURCES		+=	drivers/io/io_block.c			\
 				drivers/io/io_fip.c			\
 				drivers/io/io_storage.c			\
 				drivers/ufs/ufs.c			\

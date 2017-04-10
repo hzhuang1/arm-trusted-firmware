@@ -51,6 +51,7 @@
  * PL011 related constants
  */
 #define PL011_UART5_BASE		0xFDF05000
+#define PL011_UART6_BASE		0xFFF32000
 #define PL011_BAUDRATE			115200
 #define PL011_UART_CLK_IN_HZ		19200000
 

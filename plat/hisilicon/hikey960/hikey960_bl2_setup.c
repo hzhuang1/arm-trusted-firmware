@@ -180,8 +180,17 @@ void bl2_plat_get_bl33_meminfo(meminfo_t *bl33_meminfo)
 
 void bl2_early_platform_setup(meminfo_t *mem_layout)
 {
+	unsigned int id, uart_base;
+
+	generic_delay_timer_init();
+	hikey960_read_boardid(&id);
+	if (id == 5300)
+		uart_base = PL011_UART5_BASE;
+	else
+		uart_base = PL011_UART6_BASE;
+
 	/* Initialize the console to provide early debug support */
-	console_init(CONSOLE_BASE, PL011_UART_CLK_IN_HZ, PL011_BAUDRATE);
+	console_init(uart_base, PL011_UART_CLK_IN_HZ, PL011_BAUDRATE);
 
 	/* Setup the BL2 memory layout */
 	bl2_tzram_layout = *mem_layout;
@@ -200,8 +209,6 @@ void bl2_plat_arch_setup(void)
 void bl2_platform_setup(void)
 {
 	ufs_params_t ufs_params;
-
-	generic_delay_timer_init();
 
 	memset(&ufs_params, 0, sizeof(ufs_params_t));
 	ufs_params.reg_base = UFS_REG_BASE;
