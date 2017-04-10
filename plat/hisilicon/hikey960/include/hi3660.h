@@ -31,6 +31,7 @@
 #define __HI3660_H__
 
 #include <hi3660_crg.h>
+#include <hi3660_hkadc.h>
 
 #define LP_RAM_BASE 			0xFFF50000
 
