@@ -45,6 +45,9 @@
 #define CRG_PERSTAT2_OFFSET 		0x028
 #define PEREN2_HKADCSSI			(1 << 24)
 
+#define CRG_PEREN3_OFFSET		0x030
+#define CRG_PERDIS3_OFFSET		0x034
+
 #define CRG_PEREN4_OFFSET 		0x040
 #define CRG_PERDIS4_OFFSET 		0x044
 #define CRG_PERCLKEN4_OFFSET 		0x048
@@ -113,6 +116,8 @@
 #define SEL_SYSBUS_PLL1 		(0 << 0)
 
 #define CRG_CLKDIV3_OFFSET 		0x0B4
+#define CRG_CLKDIV5_OFFSET		0x0BC
+#define CRG_CLKDIV8_OFFSET		0x0C8
 
 #define CRG_CLKDIV12_OFFSET 		0x0D8
 #define SC_DIV_A53HPM_MASK 		(0x7 << 13)
@@ -128,6 +133,8 @@
 #define CRG_CLKDIV17_OFFSET		0x0EC
 #define SC_DIV_UFS_PERIBUS		(1 << 14)
 
+#define CRG_CLKDIV18_OFFSET		0x0F0
+#define CRG_CLKDIV19_OFFSET		0x0F4
 #define CRG_CLKDIV20_OFFSET 		0x0F8
 #define CLKDIV20_GT_CLK_AOMM 		(1 << 3)
 
@@ -140,10 +147,10 @@
 #define PERI_DDRC_SW_BIT 		(1 << 13)
 #define DIV_CLK_DDRSYS_MASK 		(0x3 << 10)
 #define DIV_CLK_DDRSYS(x) 		(((x) & 0x3) << 10)
-#define GET_DIV_CLK_DDRSYS(x) 		((x & DIV_CLK_DDRSYS_MASK) >> 10)
+#define GET_DIV_CLK_DDRSYS(x) 		(((x) & DIV_CLK_DDRSYS_MASK) >> 10)
 #define DIV_CLK_DDRCFG_MASK 		(0x6 << 5)
 #define DIV_CLK_DDRCFG(x) 		(((x) & 0x6) << 5)
-#define GET_DIV_CLK_DDRCFG(x) 		((x) & DIV_CLK_DDRCFG_MASK) >> 5)
+#define GET_DIV_CLK_DDRCFG(x) 		(((x) & DIV_CLK_DDRCFG_MASK) >> 5)
 #define DIV_CLK_DDRC_MASK 		0x1F
 #define DIV_CLK_DDRC(x) 		((x) & DIV_CLK_DDRC_MASK)
 #define GET_DIV_CLK_DDRC(x) 		((x) & DIV_CLK_DDRC_MASK)
@@ -156,6 +163,12 @@
 #define PERI_TIME_STAMP_CLK_MASK 	(0x7 << 28)
 #define PERI_TIME_STAMP_CLK_DIV(x) 	(((x) & 0x7) << 22)
 
+#define CRG_ISODIS_OFFSET		0x148
+#define CRG_PERPWREN_OFFSET		0x150
+
+#define CRG_PEREN7_OFFSET		0x420
+#define CRG_PERDIS7_OFFSET		0x424
+#define CRG_PERSTAT7_OFFSET		0x428
 #define CRG_PEREN8_OFFSET 		0x430
 #define CRG_PERDIS8_OFFSET 		0x434
 #define CRG_PERSTAT8_OFFSET 		0x438
@@ -172,6 +185,9 @@
 #define PPLL3_EN_STAT 			(1 << 21)
 #define PPLL2_EN_STAT 			(1 << 20)
 #define PPLL1_EN_STAT 			(1 << 19)
+
+#define CRG_IVP_SEC_RSTDIS_OFFSET	0xC04
+#define CRG_ISP_SEC_RSTDIS_OFFSET	0xC84
 
 #define CRG_GENERAL_SEC_RSTEN_OFFSET 	0xE20
 #define CRG_GENERAL_SEC_RSTDIS_OFFSET 	0xE24

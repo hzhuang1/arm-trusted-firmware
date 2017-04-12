@@ -166,9 +166,9 @@ static void hikey960_pmu_init(void)
 static void hikey960_enable_ppll3(void)
 {
 	/* enable ppll3 */
-	mmio_write_32(0xfff31048, 0x4904305);
-	mmio_write_32(0xfff3104c, 0x2300000);
-	mmio_write_32(0xfff3104c, 0x6300000);
+	mmio_write_32(PMC_REG_BASE + PMC_PPLL3_CTRL0_OFFSET, 0x4904305);
+	mmio_write_32(PMC_REG_BASE + PMC_PPLL3_CTRL1_OFFSET, 0x2300000);
+	mmio_write_32(PMC_REG_BASE + PMC_PPLL3_CTRL1_OFFSET, 0x6300000);
 }
 
 static void bus_idle_clear(unsigned int value)
@@ -178,11 +178,11 @@ static void bus_idle_clear(unsigned int value)
 
 	pmc_value = value << 16;
 	pmc_value &= ~value;
-	mmio_write_32(0xfff31380, pmc_value);
+	mmio_write_32(PMC_REG_BASE + PMC_NOC_POWER_IDLEREQ_OFFSET, pmc_value);
 
 	for (;;) {
-		pmc_value1 = (unsigned int)mmio_read_32(0xfff31384);
-		pmc_value2 = (unsigned int)mmio_read_32(0xfff31388);
+		pmc_value1 = (unsigned int)mmio_read_32(PMC_REG_BASE + PMC_NOC_POWER_IDLEACK_OFFSET);
+		pmc_value2 = (unsigned int)mmio_read_32(PMC_REG_BASE + PMC_NOC_POWER_IDLE_OFFSET);
 		if (((pmc_value1 & value) == 0) && ((pmc_value2 & value) == 0))
 			break;
 		udelay(1);
@@ -197,177 +197,184 @@ static void bus_idle_clear(unsigned int value)
 static void set_vivobus_power_up(void)
 {
 	/* clk enable */
-	mmio_write_32(0xfff350f8, 0x00020002);
-	mmio_write_32(0xfff35000, 0x00001000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV20_OFFSET, 0x00020002);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN0_OFFSET, 0x00001000);
 }
 
 static void set_dss_power_up(void)
 {
 	/* set edc0 133MHz = 1600MHz / 12 */
-	mmio_write_32(0xfff350bc, 0x003f000b);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV5_OFFSET, 0x003f000b);
+	/* set ldi0 ppl0 */
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV3_OFFSET, 0xf0001000);
+	/* set ldi0 133MHz, 1600MHz / 12 */
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV5_OFFSET, 0xfc002c00);
 	/* mtcmos on */
-	mmio_write_32(0xfff35150, 0x00000020);
+	mmio_write_32(CRG_REG_BASE + CRG_PERPWREN_OFFSET, 0x00000020);
 	udelay(100);
 	/* DISP CRG */
-	mmio_write_32(0xfff35094, 0x00000010);
+	mmio_write_32(CRG_REG_BASE + CRG_PERRSTDIS4_OFFSET, 0x00000010);
 	/* clk enable */
-	mmio_write_32(0xfff350f0, 0x01400140);
-	mmio_write_32(0xfff35000, 0x00002000);
-	mmio_write_32(0xfff35030, 0x0003b000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV18_OFFSET, 0x01400140);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN0_OFFSET, 0x00002000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN3_OFFSET, 0x0003b000);
 	udelay(1);
 	/* clk disable */
-	mmio_write_32(0xfff35034, 0x0003b000);
-	mmio_write_32(0xfff35004, 0x00002000);
-	mmio_write_32(0xfff350f0, 0x01400000);
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS3_OFFSET, 0x0003b000);
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS0_OFFSET, 0x00002000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV18_OFFSET, 0x01400000);
 	udelay(1);
 	/* iso disable */
-	mmio_write_32(0xfff35148, 0x00000040);
+	mmio_write_32(CRG_REG_BASE + CRG_ISODIS_OFFSET, 0x00000040);
 	/* unreset */
-	mmio_write_32(0xfff35094, 0x00000006);
-	mmio_write_32(0xfff35088, 0x00000c00);
+	mmio_write_32(CRG_REG_BASE + CRG_PERRSTDIS4_OFFSET, 0x00000006);
+	mmio_write_32(CRG_REG_BASE + CRG_PERRSTDIS3_OFFSET, 0x00000c00);
 	/* clk enable */
-	mmio_write_32(0xfff350f0, 0x01400140);
-	mmio_write_32(0xfff35000, 0x00002000);
-	mmio_write_32(0xfff35030, 0x0003b000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV18_OFFSET, 0x01400140);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN0_OFFSET, 0x00002000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN3_OFFSET, 0x0003b000);
 	/* bus idle clear */
-	bus_idle_clear(1 << 13);
+	bus_idle_clear(PMC_NOC_POWER_IDLEREQ_DSS);
 	/* set edc0 400MHz for 2K 1600MHz / 4 */
-	mmio_write_32(0xfff350bc, 0x003f0003);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV5_OFFSET, 0x003f0003);
+	/* set ldi 266MHz, 1600MHz / 6 */
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV5_OFFSET, 0xfc001400);
 }
 
 static void set_vcodec_power_up(void)
 {
 	/* clk enable */
-	mmio_write_32(0xfff350f8, 0x00040004);
-	mmio_write_32(0xfff35000, 0x00000060);
-	mmio_write_32(0xfff35020, 0x10000000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV20_OFFSET, 0x00040004);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN0_OFFSET, 0x00000060);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN2_OFFSET, 0x10000000);
 	/* unreset */
-	mmio_write_32(0xfff35064, 0x00000018);
+	mmio_write_32(CRG_REG_BASE + CRG_PERRSTDIS0_OFFSET, 0x00000018);
 	/* bus idle clear */
-	bus_idle_clear(1 << 4);
+	bus_idle_clear(PMC_NOC_POWER_IDLEREQ_VCODEC);
 }
 
 static void set_vdec_power_up(void)
 {
 	/* mtcmos on */
-	mmio_write_32(0xfff35150, 0x00000004);
+	mmio_write_32(CRG_REG_BASE + CRG_PERPWREN_OFFSET, 0x00000004);
 	udelay(100);
 	/* clk enable */
-	mmio_write_32(0xfff350f0, 0x80008000);
-	mmio_write_32(0xfff35020, 0x20080000);
-	mmio_write_32(0xfff35030, 0x00000800);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV18_OFFSET, 0x80008000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN2_OFFSET, 0x20080000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN3_OFFSET, 0x00000800);
 	udelay(1);
 	/* clk disable */
-	mmio_write_32(0xfff35034, 0x00000800);
-	mmio_write_32(0xfff35024, 0x20080000);
-	mmio_write_32(0xfff350f0, 0x80000000);
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS3_OFFSET, 0x00000800);
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS2_OFFSET, 0x20080000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV18_OFFSET, 0x80000000);
 	udelay(1);
 	/* iso disable */
-	mmio_write_32(0xfff35148, 0x00000004);
+	mmio_write_32(CRG_REG_BASE + CRG_ISODIS_OFFSET, 0x00000004);
 	/* unreset */
-	mmio_write_32(0xfff35088, 0x00000200);
+	mmio_write_32(CRG_REG_BASE + CRG_PERRSTDIS3_OFFSET, 0x00000200);
 	/* clk enable */
-	mmio_write_32(0xfff350f0, 0x80008000);
-	mmio_write_32(0xfff35020, 0x20080000);
-	mmio_write_32(0xfff35030, 0x00000800);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV18_OFFSET, 0x80008000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN2_OFFSET, 0x20080000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN3_OFFSET, 0x00000800);
 	/* bus idle clear */
-	bus_idle_clear(1 << 10);
+	bus_idle_clear(PMC_NOC_POWER_IDLEREQ_VDEC);
 }
 
 static void set_venc_power_up(void)
 {
 	/* set venc ppll3 */
-	mmio_write_32(0xfff350c8, 0x18001000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV8_OFFSET, 0x18001000);
 	/* set venc 258MHz, 1290MHz / 5 */
-	mmio_write_32(0xfff350c8, 0x07c00100);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV8_OFFSET, 0x07c00100);
 	/* mtcmos on */
-	mmio_write_32(0xfff35150, 0x00000002);
+	mmio_write_32(CRG_REG_BASE + CRG_PERPWREN_OFFSET, 0x00000002);
 	udelay(100);
 	/* clk enable */
-	mmio_write_32(0xfff350f4, 0x00010001);
-	mmio_write_32(0xfff35020, 0x40000100);
-	mmio_write_32(0xfff35030, 0x00000400);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV19_OFFSET, 0x00010001);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN2_OFFSET, 0x40000100);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN3_OFFSET, 0x00000400);
 	udelay(1);
 	/* clk disable */
-	mmio_write_32(0xfff35034, 0x00000400);
-	mmio_write_32(0xfff35024, 0x40000100);
-	mmio_write_32(0xfff350f4, 0x00010000);
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS3_OFFSET, 0x00000400);
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS2_OFFSET, 0x40000100);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV19_OFFSET, 0x00010000);
 	udelay(1);
 	/* iso disable */
+	mmio_write_32(CRG_REG_BASE + CRG_ISODIS_OFFSET, 0x00000002);
 	/* unreset */
-	mmio_write_32(0xfff35088, 0x00000100);
+	mmio_write_32(CRG_REG_BASE + CRG_PERRSTDIS3_OFFSET, 0x00000100);
 	/* clk enable */
-	mmio_write_32(0xfff350f4, 0x00010001);
-	mmio_write_32(0xfff35020, 0x40000100);
-	mmio_write_32(0xfff35030, 0x00000400);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV19_OFFSET, 0x00010001);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN2_OFFSET, 0x40000100);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN3_OFFSET, 0x00000400);
 	/* bus idle clear */
-	bus_idle_clear(1 << 11);
+	bus_idle_clear(PMC_NOC_POWER_IDLEREQ_VENC);
 	/* set venc 645MHz, 1290MHz / 2 */
-	mmio_write_32(0xfff350c8, 0x07c00040);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV8_OFFSET, 0x07c00040);
 }
 
 static void set_isp_power_up(void)
 {
 	/* mtcmos on */
-	mmio_write_32(0xfff35150, 0x00000001);
+	mmio_write_32(CRG_REG_BASE + CRG_PERPWREN_OFFSET, 0x00000001);
 	udelay(100);
 	/* clk enable */
-	mmio_write_32(0xfff350f0, 0x70007000);
-	mmio_write_32(0xfff350f8, 0x00100010);
-	mmio_write_32(0xfff35050, 0x01000010);
-	mmio_write_32(0xfff35030, 0x0bf00000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV18_OFFSET, 0x70007000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV20_OFFSET, 0x00100010);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN5_OFFSET, 0x01000010);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN3_OFFSET, 0x0bf00000);
 	udelay(1);
 	/* clk disable */
-	mmio_write_32(0xfff35054, 0x01000010);
-	mmio_write_32(0xfff35034, 0x0bf00000);
-	mmio_write_32(0xfff350f0, 0x70000000);
-	mmio_write_32(0xfff350f8, 0x00100000);
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS5_OFFSET, 0x01000010);
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS3_OFFSET, 0x0bf00000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV18_OFFSET, 0x70000000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV20_OFFSET, 0x00100000);
 	udelay(1);
 	/* iso disable */
-	mmio_write_32(0xfff35148, 0x00000001);
+	mmio_write_32(CRG_REG_BASE + CRG_ISODIS_OFFSET, 0x00000001);
 	/* unreset */
-	mmio_write_32(0xfff35c84, 0x0000002f);
+	mmio_write_32(CRG_REG_BASE + CRG_ISP_SEC_RSTDIS_OFFSET, 0x0000002f);
 	/* clk enable */
-	mmio_write_32(0xfff350f0, 0x70007000);
-	mmio_write_32(0xfff350f8, 0x00100010);
-	mmio_write_32(0xfff35050, 0x01000010);
-	mmio_write_32(0xfff35030, 0x0bf00000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV18_OFFSET, 0x70007000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV20_OFFSET, 0x00100010);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN5_OFFSET, 0x01000010);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN3_OFFSET, 0x0bf00000);
 	/* bus idle clear */
-	bus_idle_clear(1 << 5);
+	bus_idle_clear(PMC_NOC_POWER_IDLEREQ_ISP);
 	/* csi clk enable */
-	mmio_write_32(0xfff35030, 0x00700000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN3_OFFSET, 0x00700000);
 }
 
 static void set_ivp_power_up(void)
 {
 	/* set ivp ppll0 */
-	mmio_write_32(0xfff350a8, 0xc0000000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV0_OFFSET, 0xc0000000);
 	/* set ivp 267MHz, 1600MHz / 6 */
-	mmio_write_32(0xfff350a8, 0x3c001400);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV0_OFFSET, 0x3c001400);
 	/* mtcmos on */
-	mmio_write_32(0xfff35150, 0x00200000);
+	mmio_write_32(CRG_REG_BASE + CRG_PERPWREN_OFFSET, 0x00200000);
 	udelay(100);
 	/* IVP CRG unreset */
-	mmio_write_32(0xfff35c04, 0x00000001);
+	mmio_write_32(CRG_REG_BASE + CRG_IVP_SEC_RSTDIS_OFFSET, 0x00000001);
 	/* clk enable */
-	mmio_write_32(0xfff350f8, 0x02000200);
-	mmio_write_32(0xfff35040, 0x000000a8);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV20_OFFSET, 0x02000200);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN4_OFFSET, 0x000000a8);
 	udelay(1);
 	/* clk disable */
-	mmio_write_32(0xfff35044, 0x000000a8);
-	mmio_write_32(0xfff350f8, 0x02000000);
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS4_OFFSET, 0x000000a8);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV20_OFFSET, 0x02000000);
 	udelay(1);
 	/* iso disable */
-	mmio_write_32(0xfff35148, 0x01000000);
+	mmio_write_32(CRG_REG_BASE + CRG_ISODIS_OFFSET, 0x01000000);
 	/* unreset */
-	mmio_write_32(0xfff35c04, 0x00000002);
+	mmio_write_32(CRG_REG_BASE + CRG_IVP_SEC_RSTDIS_OFFSET, 0x00000002);
 	/* clk enable */
-	mmio_write_32(0xfff350f8, 0x02000200);
-	mmio_write_32(0xfff35040, 0x000000a8);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV20_OFFSET, 0x02000200);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN4_OFFSET, 0x000000a8);
 	/* bus idle clear */
-	bus_idle_clear(1 << 14);
+	bus_idle_clear(PMC_NOC_POWER_IDLEREQ_IVP);
 	/* set ivp 533MHz, 1600MHz / 3 */
-	mmio_write_32(0xfff350a8, 0x3c000800);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV0_OFFSET, 0x3c000800);
 }
 
 static void set_audio_power_up(void)
@@ -375,41 +382,41 @@ static void set_audio_power_up(void)
 	unsigned int ret;
 	int timeout = 100;
 	/* mtcmos on */
-	mmio_write_32(0xfff0a060, 0x00000001);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPWREN_OFFSET, 0x00000001);
 	udelay(100);
 	/* clk enable */
-	mmio_write_32(0xfff350f4, 0x80108010);
-	mmio_write_32(0xfff0a258, 0x00010001);
-	mmio_write_32(0xfff0a160, 0x0c000000);
-	mmio_write_32(0xfff35000, 0x04000000);
-	mmio_write_32(0xfff35050, 0x00000080);
-	mmio_write_32(0xfff0a170, 0x0000000f);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV19_OFFSET, 0x80108010);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCCLKDIV2_OFFSET, 0x00010001);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPEREN0_OFFSET, 0x0c000000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN0_OFFSET, 0x04000000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN5_OFFSET, 0x00000080);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPEREN1_OFFSET, 0x0000000f);
 	udelay(1);
 	/* clk disable */
-	mmio_write_32(0xfff0a174, 0x0000000f);
-	mmio_write_32(0xfff0a164, 0x0c000000);
-	mmio_write_32(0xfff35054, 0x00000080);
-	mmio_write_32(0xfff35004, 0x04000000);
-	mmio_write_32(0xfff0a258, 0x00010000);
-	mmio_write_32(0xfff350f4, 0x80100000);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPERDIS1_OFFSET, 0x0000000f);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPERDIS0_OFFSET, 0x0c000000);
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS5_OFFSET, 0x00000080);
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS0_OFFSET, 0x04000000);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCCLKDIV2_OFFSET, 0x00010000);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV19_OFFSET, 0x80100000);
 	udelay(1);
 	/* iso disable */
-	mmio_write_32(0xfff0a044, 0x00000001);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCISODIS_OFFSET, 0x00000001);
 	udelay(1);
 	/* unreset */
-	mmio_write_32(0xfff0aa54, 0x00000001);
-	mmio_write_32(0xfff0a204, 0x00000780);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_PERRSTDIS1_SEC_OFFSET, 0x00000001);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPERRSTDIS0_OFFSET, 0x00000780);
 	/* clk enable */
-	mmio_write_32(0xfff350f4, 0x80108010);
-	mmio_write_32(0xfff0a258, 0x00010001);
-	mmio_write_32(0xfff0a160, 0x0c000000);
-	mmio_write_32(0xfff35000, 0x04000000);
-	mmio_write_32(0xfff35050, 0x00000080);
-	mmio_write_32(0xfff0a170, 0x0000000f);
+	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV19_OFFSET, 0x80108010);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCCLKDIV2_OFFSET, 0x00010001);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPEREN0_OFFSET, 0x0c000000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN0_OFFSET, 0x04000000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN5_OFFSET, 0x00000080);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPEREN1_OFFSET, 0x0000000f);
 	/* bus idle clear */
-	mmio_write_32(0xfff0a31c, 0x00040000);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPERCTRL7_OFFSET, 0x00040000);
 	for (;;) {
-		ret = mmio_read_32(0xfff0a378);
+		ret = mmio_read_32(SCTRL_REG_BASE + SCTRL_SCPERSTAT6_OFFSET);
 		if (((ret & (1 << 5)) == 0) && ((ret & (1 << 8)) == 0))
 			break;
 		udelay(1);
@@ -419,32 +426,32 @@ static void set_audio_power_up(void)
 			break;
 		}
 	}
-	mmio_write_32(0xe804e148, 0x00ff0000);
+	mmio_write_32(ASP_CFG_REG_BASE + ASP_CFG_MMBUF_CTRL_OFFSET, 0x00ff0000);
 }
 
 static void set_pcie_power_up(void)
 {
 	/* mtcmos on */
-	mmio_write_32(0xfff0a060, 0x00000010);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPWREN_OFFSET, 0x00000010);
 	udelay(100);
 	/* clk enable */
-	mmio_write_32(0xfff0a268, 0x08000800);
-	mmio_write_32(0xfff0a190, 0x00104000);
-	mmio_write_32(0xfff35420, 0x000003a0);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCCLKDIV6_OFFSET, 0x08000800);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPEREN2_OFFSET, 0x00104000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN7_OFFSET, 0x000003a0);
 	udelay(1);
 	/* clk disable */
-	mmio_write_32(0xfff0a194, 0x00104000);
-	mmio_write_32(0xfff35424, 0x000003a0);
-	mmio_write_32(0xfff0a268, 0x08000000);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPERDIS2_OFFSET, 0x00104000);
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS7_OFFSET, 0x000003a0);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCCLKDIV6_OFFSET, 0x08000000);
 	udelay(1);
 	/* iso disable */
-	mmio_write_32(0xfff0a044, 0x00000030);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCISODIS_OFFSET, 0x00000030);
 	/* unreset */
-	mmio_write_32(0xfff35088, 0x8c000000);
+	mmio_write_32(CRG_REG_BASE + CRG_PERRSTDIS3_OFFSET, 0x8c000000);
 	/* clk enable */
-	mmio_write_32(0xfff0a268, 0x08000800);
-	mmio_write_32(0xfff0a190, 0x00104000);
-	mmio_write_32(0xfff35420, 0x000003a0);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCCLKDIV6_OFFSET, 0x08000800);
+	mmio_write_32(SCTRL_REG_BASE + SCTRL_SCPEREN2_OFFSET, 0x00104000);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN7_OFFSET, 0x000003a0);
 }
 
 static void ispfunc_enable(void)
