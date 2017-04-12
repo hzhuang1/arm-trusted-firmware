@@ -591,15 +591,15 @@ static void hikey960_ufs_init(void)
 
 static void hikey960_tzc_init(void)
 {
-	mmio_write_32(TZC_REG_BASE + TZC_EN0_OFFSET, ~0);
-	mmio_write_32(TZC_REG_BASE + TZC_EN1_OFFSET, ~0);
-	mmio_write_32(TZC_REG_BASE + TZC_EN2_OFFSET, ~0);
-	mmio_write_32(TZC_REG_BASE + TZC_EN3_OFFSET, ~0);
-	mmio_write_32(TZC_REG_BASE + TZC_EN4_OFFSET, ~0);
-	mmio_write_32(TZC_REG_BASE + TZC_EN5_OFFSET, ~0);
-	mmio_write_32(TZC_REG_BASE + TZC_EN6_OFFSET, ~0);
-	mmio_write_32(TZC_REG_BASE + TZC_EN7_OFFSET, ~0);
-	mmio_write_32(TZC_REG_BASE + TZC_EN8_OFFSET, ~0);
+	mmio_write_32(TZC_REG_BASE + TZC_EN0_OFFSET, 0x7fbff066);
+	mmio_write_32(TZC_REG_BASE + TZC_EN1_OFFSET, 0xfffff5fc);
+	mmio_write_32(TZC_REG_BASE + TZC_EN2_OFFSET, 0x0007005c);
+	mmio_write_32(TZC_REG_BASE + TZC_EN3_OFFSET, 0x37030700);
+	mmio_write_32(TZC_REG_BASE + TZC_EN4_OFFSET, 0xf63fefae);
+	mmio_write_32(TZC_REG_BASE + TZC_EN5_OFFSET, 0x000410fd);
+	mmio_write_32(TZC_REG_BASE + TZC_EN6_OFFSET, 0x0063ff68);
+	mmio_write_32(TZC_REG_BASE + TZC_EN7_OFFSET, 0x030000f3);
+	mmio_write_32(TZC_REG_BASE + TZC_EN8_OFFSET, 0x00000007);
 }
 
 /*
