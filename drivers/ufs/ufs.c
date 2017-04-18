@@ -769,12 +769,14 @@ int ufs_init(const ufs_ops_t *ops, ufs_params_t *params)
 		assert(result == 0);
 		assert((data > 0) && (data <= 3));
 	} else {
-		assert((ops != NULL) && (ops->phy_init != NULL));
+		assert((ops != NULL) && (ops->phy_init != NULL) &&
+		       (ops->phy_set_pwr_mode != NULL));
 
 		ufshc_reset(ufs_params.reg_base);
 		ops->phy_init(&ufs_params);
 		result = ufshc_link_startup(ufs_params.reg_base);
 		assert(result == 0);
+		ops->phy_set_pwr_mode(&ufs_params);
 	}
 
 	ufs_enum();

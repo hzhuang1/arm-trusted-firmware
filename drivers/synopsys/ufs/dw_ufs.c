@@ -116,8 +116,111 @@ static int dwufs_phy_init(ufs_params_t *params)
 	return 0;
 }
 
+static int dwufs_phy_set_pwr_mode(ufs_params_t *params)
+{
+	int result;
+	unsigned int data, tx_lanes, rx_lanes;
+	uintptr_t base;
+
+	assert((params != NULL) && 		\
+	       (params->reg_base != 0));
+
+	base = params->reg_base;
+
+	// PA_Tactive
+	result = ufshc_dme_get(0x15A8, 0, &data);
+	assert(result == 0);
+	if (data < 7) {
+		result = ufshc_dme_set(0x15A8, 0, 7);
+		assert(result == 0);
+	}
+	result = ufshc_dme_get(0x1561, 0, &tx_lanes);
+	assert(result == 0);
+	result = ufshc_dme_get(0x1581, 0, &rx_lanes);
+	assert(result == 0);
+
+	// PA TxSkip
+	result = ufshc_dme_set(0x155c, 0, 0);
+	assert(result == 0);
+	// PA TxGear
+	result = ufshc_dme_set(0x1568, 0, 3);
+	assert(result == 0);
+	// PA RxGear
+	result = ufshc_dme_set(0x1583, 0, 3);
+	assert(result == 0);
+	// PA HSSeries
+	result = ufshc_dme_set(0x156a, 0, 2);
+	assert(result == 0);
+	// PA TxTermination
+	result = ufshc_dme_set(0x1569, 0, 1);
+	assert(result == 0);
+	// PA RxTermination
+	result = ufshc_dme_set(0x1584, 0, 1);
+	assert(result == 0);
+	// PA Scrambling
+	result = ufshc_dme_set(0x1585, 0, 0);
+	assert(result == 0);
+	// PA ActiveTxDataLines
+	result = ufshc_dme_set(0x1560, 0, tx_lanes);
+	assert(result == 0);
+	// PA ActiveRxDataLines
+	result = ufshc_dme_set(0x1580, 0, rx_lanes);
+	assert(result == 0);
+	// PA_PWRModeUserData0 = 8191
+	result = ufshc_dme_set(0x15b0, 0, 8191);
+	assert(result == 0);
+	// PA_PWRModeUserData1 = 65535
+	result = ufshc_dme_set(0x15b1, 0, 65535);
+	assert(result == 0);
+	// PA_PWRModeUserData2 = 32767
+	result = ufshc_dme_set(0x15b2, 0, 32767);
+	assert(result == 0);
+	// DME_FC0ProtectionTimeOutVal = 8191
+	result = ufshc_dme_set(0xd041, 0, 8191);
+	assert(result == 0);
+	// DME_TC0ReplayTimeOutVal = 65535
+	result = ufshc_dme_set(0xd042, 0, 65535);
+	assert(result == 0);
+	// DME_AFC0ReqTimeOutVal = 32767
+	result = ufshc_dme_set(0xd043, 0, 32767);
+	assert(result == 0);
+	// PA_PWRModeUserData3 = 8191
+	result = ufshc_dme_set(0x15b3, 0, 8191);
+	assert(result == 0);
+	// PA_PWRModeUserData4 = 65535
+	result = ufshc_dme_set(0x15b4, 0, 65535);
+	assert(result == 0);
+	// PA_PWRModeUserData5 = 32767
+	result = ufshc_dme_set(0x15b5, 0, 32767);
+	assert(result == 0);
+	// DME_FC1ProtectionTimeOutVal = 8191
+	result = ufshc_dme_set(0xd044, 0, 8191);
+	assert(result == 0);
+	// DME_TC1ReplayTimeOutVal = 65535
+	result = ufshc_dme_set(0xd045, 0, 65535);
+	assert(result == 0);
+	// DME_AFC1ReqTimeOutVal = 32767
+	result = ufshc_dme_set(0xd046, 0, 32767);
+	assert(result == 0);
+
+	result = ufshc_dme_set(0x1571, 0, 0x11);
+	assert(result == 0);
+	do {
+		data = mmio_read_32(base + IS);
+	} while ((data & UFS_INT_UPMS) == 0);
+	mmio_write_32(base + IS, UFS_INT_UPMS);
+	data = mmio_read_32(base + HCS);
+	if ((data & HCS_UPMCRS_MASK) == HCS_PWR_LOCAL) {
+		INFO("ufs: change power mode success\n");
+	} else {
+		WARN("ufs: HCS.UPMCRS error, HCS:0x%x\n", data);
+	}
+	return 0;
+}
+
 const ufs_ops_t dw_ufs_ops = {
-	.phy_init 	= dwufs_phy_init,
+	.phy_init 		= dwufs_phy_init,
+	.phy_set_pwr_mode	= dwufs_phy_set_pwr_mode,
 };
 
 int dw_ufs_init(dw_ufs_params_t *params)

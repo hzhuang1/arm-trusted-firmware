@@ -532,6 +532,7 @@ typedef struct ufs_params {
 
 typedef struct ufs_ops {
 	int 		(*phy_init)(ufs_params_t *params);
+	int		(*phy_set_pwr_mode)(ufs_params_t *params);
 } ufs_ops_t;
 
 int ufshc_send_uic_cmd(uintptr_t base, uic_cmd_t *cmd);
