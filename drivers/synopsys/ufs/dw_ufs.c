@@ -50,7 +50,7 @@ static int dwufs_phy_init(ufs_params_t *params)
 
 	/* Unipro VS_MPHY disable */
 	ufshc_dme_set(VS_MPHY_DISABLE_OFFSET, 0, VS_MPHY_DISABLE_MPHYDIS);
-	ufshc_dme_set(PA_HSSERIES_OFFSET, 0, 2);
+	ufshc_dme_set(PA_HS_SERIES_OFFSET, 0, 2);
 	/* MPHY CBRATESEL */
 	ufshc_dme_set(0x8114, 0, 1);
 	/* MPHY CBOVRCTRL2 */
@@ -127,83 +127,61 @@ static int dwufs_phy_set_pwr_mode(ufs_params_t *params)
 
 	base = params->reg_base;
 
-	// PA_Tactive
-	result = ufshc_dme_get(0x15A8, 0, &data);
+	result = ufshc_dme_get(PA_TACTIVATE_OFFSET, 0, &data);
 	assert(result == 0);
 	if (data < 7) {
-		result = ufshc_dme_set(0x15A8, 0, 7);
+		result = ufshc_dme_set(PA_TACTIVATE_OFFSET, 0, 7);
 		assert(result == 0);
 	}
-	result = ufshc_dme_get(0x1561, 0, &tx_lanes);
+	result = ufshc_dme_get(PA_CONNECTED_TX_DATA_LANES_OFFSET, 0, &tx_lanes);
 	assert(result == 0);
-	result = ufshc_dme_get(0x1581, 0, &rx_lanes);
-	assert(result == 0);
-
-	// PA TxSkip
-	result = ufshc_dme_set(0x155c, 0, 0);
-	assert(result == 0);
-	// PA TxGear
-	result = ufshc_dme_set(0x1568, 0, 3);
-	assert(result == 0);
-	// PA RxGear
-	result = ufshc_dme_set(0x1583, 0, 3);
-	assert(result == 0);
-	// PA HSSeries
-	result = ufshc_dme_set(0x156a, 0, 2);
-	assert(result == 0);
-	// PA TxTermination
-	result = ufshc_dme_set(0x1569, 0, 1);
-	assert(result == 0);
-	// PA RxTermination
-	result = ufshc_dme_set(0x1584, 0, 1);
-	assert(result == 0);
-	// PA Scrambling
-	result = ufshc_dme_set(0x1585, 0, 0);
-	assert(result == 0);
-	// PA ActiveTxDataLines
-	result = ufshc_dme_set(0x1560, 0, tx_lanes);
-	assert(result == 0);
-	// PA ActiveRxDataLines
-	result = ufshc_dme_set(0x1580, 0, rx_lanes);
-	assert(result == 0);
-	// PA_PWRModeUserData0 = 8191
-	result = ufshc_dme_set(0x15b0, 0, 8191);
-	assert(result == 0);
-	// PA_PWRModeUserData1 = 65535
-	result = ufshc_dme_set(0x15b1, 0, 65535);
-	assert(result == 0);
-	// PA_PWRModeUserData2 = 32767
-	result = ufshc_dme_set(0x15b2, 0, 32767);
-	assert(result == 0);
-	// DME_FC0ProtectionTimeOutVal = 8191
-	result = ufshc_dme_set(0xd041, 0, 8191);
-	assert(result == 0);
-	// DME_TC0ReplayTimeOutVal = 65535
-	result = ufshc_dme_set(0xd042, 0, 65535);
-	assert(result == 0);
-	// DME_AFC0ReqTimeOutVal = 32767
-	result = ufshc_dme_set(0xd043, 0, 32767);
-	assert(result == 0);
-	// PA_PWRModeUserData3 = 8191
-	result = ufshc_dme_set(0x15b3, 0, 8191);
-	assert(result == 0);
-	// PA_PWRModeUserData4 = 65535
-	result = ufshc_dme_set(0x15b4, 0, 65535);
-	assert(result == 0);
-	// PA_PWRModeUserData5 = 32767
-	result = ufshc_dme_set(0x15b5, 0, 32767);
-	assert(result == 0);
-	// DME_FC1ProtectionTimeOutVal = 8191
-	result = ufshc_dme_set(0xd044, 0, 8191);
-	assert(result == 0);
-	// DME_TC1ReplayTimeOutVal = 65535
-	result = ufshc_dme_set(0xd045, 0, 65535);
-	assert(result == 0);
-	// DME_AFC1ReqTimeOutVal = 32767
-	result = ufshc_dme_set(0xd046, 0, 32767);
+	result = ufshc_dme_get(PA_CONNECTED_RX_DATA_LANES_OFFSET, 0, &rx_lanes);
 	assert(result == 0);
 
-	result = ufshc_dme_set(0x1571, 0, 0x11);
+	result = ufshc_dme_set(PA_TX_SKIP_OFFSET, 0, 0);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_TX_GEAR_OFFSET, 0, 3);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_RX_GEAR_OFFSET, 0, 3);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_HS_SERIES_OFFSET, 0, 2);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_TX_TERMINATION_OFFSET, 0, 1);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_RX_TERMINATION_OFFSET, 0, 1);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_SCRAMBLING_OFFSET, 0, 0);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_ACTIVE_TX_DATA_LANES_OFFSET, 0, tx_lanes);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_ACTIVE_RX_DATA_LANES_OFFSET, 0, rx_lanes);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_PWR_MODE_USER_DATA0_OFFSET, 0, 8191);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_PWR_MODE_USER_DATA1_OFFSET, 0, 65535);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_PWR_MODE_USER_DATA2_OFFSET, 0, 32767);
+	assert(result == 0);
+	result = ufshc_dme_set(DME_FC0_PROTECTION_TIMEOUT_OFFSET, 0, 8191);
+	assert(result == 0);
+	result = ufshc_dme_set(DME_TC0_REPLAY_TIMEOUT_OFFSET, 0, 65535);
+	assert(result == 0);
+	result = ufshc_dme_set(DME_AFC0_REQ_TIMEOUT_OFFSET, 0, 32767);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_PWR_MODE_USER_DATA3_OFFSET, 0, 8191);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_PWR_MODE_USER_DATA4_OFFSET, 0, 65535);
+	assert(result == 0);
+	result = ufshc_dme_set(PA_PWR_MODE_USER_DATA5_OFFSET, 0, 32767);
+	assert(result == 0);
+	result = ufshc_dme_set(DME_FC1_PROTECTION_TIMEOUT_OFFSET, 0, 8191);
+	assert(result == 0);
+	result = ufshc_dme_set(DME_TC1_REPLAY_TIMEOUT_OFFSET, 0, 65535);
+	assert(result == 0);
+	result = ufshc_dme_set(DME_AFC1_REQ_TIMEOUT_OFFSET, 0, 32767);
+	assert(result == 0);
+
+	result = ufshc_dme_set(PA_PWR_MODE_OFFSET, 0, 0x11);
 	assert(result == 0);
 	do {
 		data = mmio_read_32(base + IS);
