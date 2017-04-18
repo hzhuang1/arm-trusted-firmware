@@ -527,6 +527,24 @@ static void hikey960_ufs_reset(void)
 {
 	unsigned int data, mask;
 
+	mmio_write_32(CRG_REG_BASE + CRG_PERDIS7_OFFSET, 1 << 14);
+	mmio_clrbits_32(UFS_SYS_REG_BASE + UFS_SYS_PHY_CLK_CTRL_OFFSET,
+			BIT_SYSCTRL_REF_CLOCK_EN);
+	do {
+		data = mmio_read_32(UFS_SYS_REG_BASE +
+				    UFS_SYS_PHY_CLK_CTRL_OFFSET);
+	} while (data & BIT_SYSCTRL_REF_CLOCK_EN);
+	/* use abb clk */
+	mmio_clrbits_32(UFS_SYS_REG_BASE + UFS_SYS_UFS_SYSCTRL_OFFSET,
+			BIT_UFS_REFCLK_SRC_SE1);
+	mmio_clrbits_32(UFS_SYS_REG_BASE + UFS_SYS_PHY_ISO_EN_OFFSET,
+			BIT_UFS_REFCLK_ISO_EN);
+	mmio_write_32(PCTRL_REG_BASE + PCTRL_PERI_CTRL3_OFFSET, (1 << 0) | (1 << 16));
+	mdelay(1);
+	mmio_write_32(CRG_REG_BASE + CRG_PEREN7_OFFSET, 1 << 14);
+	mmio_setbits_32(UFS_SYS_REG_BASE + UFS_SYS_PHY_CLK_CTRL_OFFSET,
+			BIT_SYSCTRL_REF_CLOCK_EN);
+
 	mmio_write_32(CRG_REG_BASE + CRG_PERRSTEN3_OFFSET, PERI_UFS_BIT);
 	do {
 		data = mmio_read_32(CRG_REG_BASE + CRG_PERRSTSTAT3_OFFSET);
@@ -538,8 +556,10 @@ static void hikey960_ufs_reset(void)
 			BIT_SYSCTRL_PWR_READY);
 	mmio_write_32(UFS_SYS_REG_BASE + UFS_SYS_UFS_DEVICE_RESET_CTRL_OFFSET,
 		      MASK_UFS_DEVICE_RESET);
+	// clear SC_DIV_UFS_PERIBUS
 	mask = SC_DIV_UFS_PERIBUS << 16;
 	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV17_OFFSET, mask);
+	// set SC_DIV_UFSPHY_CFG(3)
 	mask = SC_DIV_UFSPHY_CFG_MASK << 16;
 	data = SC_DIV_UFSPHY_CFG(3);
 	mmio_write_32(CRG_REG_BASE + CRG_CLKDIV16_OFFSET, mask | data);
@@ -549,6 +569,10 @@ static void hikey960_ufs_reset(void)
 	mmio_write_32(UFS_SYS_REG_BASE + UFS_SYS_PHY_CLK_CTRL_OFFSET, data);
 	mmio_clrbits_32(UFS_SYS_REG_BASE + UFS_SYS_PHY_CLK_CTRL_OFFSET,
 			MASK_SYSCTRL_REF_CLOCK_SEL);
+	mmio_setbits_32(UFS_SYS_REG_BASE + UFS_SYS_CLOCK_GATE_BYPASS_OFFSET,
+			MASK_UFS_CLK_GATE_BYPASS);
+	mmio_setbits_32(UFS_SYS_REG_BASE + UFS_SYS_UFS_SYSCTRL_OFFSET,
+			MASK_UFS_SYSCTRL_BYPASS);
 
 	mmio_setbits_32(UFS_SYS_REG_BASE + UFS_SYS_PSW_CLK_CTRL_OFFSET,
 			BIT_SYSCTRL_PSW_CLK_EN);
