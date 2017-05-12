@@ -85,6 +85,10 @@ static const io_uuid_spec_t bl2_uuid_spec = {
 	.uuid = UUID_TRUSTED_BOOT_FIRMWARE_BL2,
 };
 
+static const io_uuid_spec_t scp_bl2_uuid_spec = {
+	.uuid = UUID_SCP_FIRMWARE_SCP_BL2,
+};
+
 static const io_uuid_spec_t bl31_uuid_spec = {
 	.uuid = UUID_EL3_RUNTIME_FIRMWARE_BL31,
 };
@@ -102,6 +106,11 @@ static const struct plat_io_policy policies[] = {
 	[BL2_IMAGE_ID] = {
 		&fip_dev_handle,
 		(uintptr_t)&bl2_uuid_spec,
+		check_fip
+	},
+	[SCP_BL2_IMAGE_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&scp_bl2_uuid_spec,
 		check_fip
 	},
 	[BL31_IMAGE_ID] = {

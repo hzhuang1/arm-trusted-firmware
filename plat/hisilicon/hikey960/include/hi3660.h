@@ -32,6 +32,7 @@
 
 #include <hi3660_crg.h>
 #include <hi3660_hkadc.h>
+#include <hi3660_mem_map.h>
 
 #define ASP_CFG_REG_BASE		0xE804E000
 

@@ -126,6 +126,67 @@ bl31_params_t *bl2_plat_get_bl31_params(void)
 	return bl2_to_bl31_params;
 }
 
+/*******************************************************************************
+ * Populate the extents of memory available for loading SCP_BL2 (if used),
+ * i.e. anywhere in trusted RAM as long as it doesn't overwrite BL2.
+ ******************************************************************************/
+void bl2_plat_get_scp_bl2_meminfo(meminfo_t *scp_bl2_meminfo)
+{
+	ufs_params_t ufs_params;
+
+	memset(&ufs_params, 0, sizeof(ufs_params_t));
+	ufs_params.reg_base = UFS_REG_BASE;
+	ufs_params.desc_base = HIKEY960_UFS_DESC_BASE;
+	ufs_params.desc_size = HIKEY960_UFS_DESC_SIZE;
+	ufs_params.flags = UFS_FLAGS_SKIPINIT;
+	ufs_init(NULL, &ufs_params);
+
+	hikey960_io_setup();
+
+	*scp_bl2_meminfo = bl2_tzram_layout;
+}
+
+extern int load_lpm3(void);
+
+int bl2_plat_handle_scp_bl2(image_info_t *scp_bl2_image_info)
+{
+	int i;
+	int *buf;
+
+	assert(scp_bl2_image_info->image_size < SCP_MEM_SIZE);
+
+	INFO("BL2: Initiating SCP_BL2 transfer to SCP\n");
+
+	INFO("BL2: SCP_BL2: 0x%lx@0x%x\n",
+	     scp_bl2_image_info->image_base,
+	     scp_bl2_image_info->image_size);
+
+	buf = (int *)scp_bl2_image_info->image_base;
+
+	INFO("BL2: SCP_BL2 HEAD:\n");
+	for (i = 0; i < 64; i += 4)
+		INFO("BL2: SCP_BL2 0x%x 0x%x 0x%x 0x%x\n",
+			buf[i], buf[i+1], buf[i+2], buf[i+3]);
+
+	buf = (int *)(scp_bl2_image_info->image_base +
+		      scp_bl2_image_info->image_size - 256);
+
+	INFO("BL2: SCP_BL2 TAIL:\n");
+	for (i = 0; i < 64; i += 4)
+		INFO("BL2: SCP_BL2 0x%x 0x%x 0x%x 0x%x\n",
+			buf[i], buf[i+1], buf[i+2], buf[i+3]);
+
+	memcpy((void *)SCP_MEM_BASE,
+	       (void *)scp_bl2_image_info->image_base,
+	       scp_bl2_image_info->image_size);
+
+	INFO("BL2: SCP_BL2 transferred to SCP\n");
+
+	load_lpm3();
+
+	return 0;
+}
+
 struct entry_point_info *bl2_plat_get_bl31_ep_info(void)
 {
 	return &bl31_params_mem.bl31_ep_info;
@@ -208,17 +269,6 @@ void bl2_plat_arch_setup(void)
 
 void bl2_platform_setup(void)
 {
-	ufs_params_t ufs_params;
-
-	memset(&ufs_params, 0, sizeof(ufs_params_t));
-	ufs_params.reg_base = UFS_REG_BASE;
-	ufs_params.desc_base = HIKEY960_UFS_DESC_BASE;
-	ufs_params.desc_size = HIKEY960_UFS_DESC_SIZE;
-	ufs_params.flags = UFS_FLAGS_SKIPINIT;
-	ufs_init(NULL, &ufs_params);
-
-	hikey960_io_setup();
-
 	/* disable WDT0 */
 	if (mmio_read_32(WDT0_REG_BASE + WDT_LOCK_OFFSET) == WDT_LOCKED) {
 		mmio_write_32(WDT0_REG_BASE + WDT_LOCK_OFFSET, WDT_UNLOCK);

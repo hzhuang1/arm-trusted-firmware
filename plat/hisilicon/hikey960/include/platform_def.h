@@ -96,6 +96,11 @@
 #define BL2_BASE			(BL31_LIMIT)		/* 1AD5_8000 */
 #define BL2_LIMIT			(BL2_BASE + 0x40000) 	/* 1AD9_8000 */
 
+#define SCP_BL2_BASE			BL31_BASE
+
+#define SCP_MEM_BASE			(0x89C80000)
+#define SCP_MEM_SIZE			(0x00040000)
+
 #if 0
 /*
  * BL2U specific defines.
