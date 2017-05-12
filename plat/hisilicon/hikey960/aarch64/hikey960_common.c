@@ -103,7 +103,7 @@ HIKEY960_CONFIGURE_MMU_EL(3)
 
 unsigned long plat_get_ns_image_entrypoint(void)
 {
-	return HIKEY960_NS_IMAGE_OFFSET;
+	return NS_BL1U_BASE;
 }
 
 unsigned int plat_get_syscnt_freq2(void)

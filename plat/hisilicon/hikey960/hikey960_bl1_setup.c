@@ -690,9 +690,15 @@ void bl1_plat_set_ep_info(unsigned int image_id,
 		entry_point_info_t *ep_info)
 {
 	unsigned int data = 0;
+	uintptr_t tmp = 0x1AE00000;
 
 	if (image_id == BL2_IMAGE_ID)
 		return;
+	/* Copy NS BL1U from 0x1AC1_8000 to 0x1AC9_8000 */
+	memcpy((void *)tmp, (void *)HIKEY960_NS_IMAGE_OFFSET,
+		NS_BL1U_SIZE);
+	memcpy((void *)NS_BL1U_BASE, (void *)tmp, NS_BL1U_SIZE);
+	inv_dcache_range(NS_BL1U_BASE, NS_BL1U_SIZE);
 	/* Initialize the GIC driver, cpu and distributor interfaces */
 	gicv2_driver_init(&hikey960_gic_data);
 	gicv2_distif_init();

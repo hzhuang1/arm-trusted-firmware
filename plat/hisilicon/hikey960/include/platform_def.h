@@ -79,7 +79,7 @@
 #define BL1_RO_LIMIT			(BL1_RO_BASE + 0x10000)
 #define BL1_RW_BASE			(BL1_RO_LIMIT) 		/* 1AC1_0000 */
 #define BL1_RW_SIZE			(0x00188000)
-#define BL1_RW_LIMIT			(0x1AD98000)
+#define BL1_RW_LIMIT			(0x1B000000)
 
 /*
  * BL2 specific defines.
@@ -94,9 +94,10 @@
 #define BL31_LIMIT			(BL31_BASE + 0x40000)	/* 1AC9_8000 */
 
 #define NS_BL1U_BASE			(BL31_LIMIT)		/* 1AC9_8000 */
-#define NS_BL1U_LIMIT			(NS_BL1U_BASE + 0x100000)
+#define NS_BL1U_SIZE			(0x00100000)
+#define NS_BL1U_LIMIT			(NS_BL1U_BASE + NS_BL1U_SIZE)
 
-#define HIKEY960_NS_IMAGE_OFFSET	(NS_BL1U_BASE)
+#define HIKEY960_NS_IMAGE_OFFSET	(0x1AC18000)	/* offset in l-loader */
 
 #define SCP_BL2_BASE			BL31_BASE
 
