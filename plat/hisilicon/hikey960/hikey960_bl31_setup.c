@@ -39,6 +39,7 @@
 #include <generic_delay_timer.h>
 #include <gicv2.h>
 #include <hi3660.h>
+#include <hisi_ipc.h>
 #include <platform_def.h>
 
 #include "hikey960_def.h"
@@ -143,6 +144,8 @@ void bl31_platform_setup(void)
 	gicv2_distif_init();
 	gicv2_pcpu_distif_init();
 	gicv2_cpuif_enable();
+
+	hisi_ipc_init();
 }
 
 void bl31_plat_runtime_setup(void)
