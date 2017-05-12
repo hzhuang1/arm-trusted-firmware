@@ -191,6 +191,7 @@
 #define CRG_IVP_SEC_RSTDIS_OFFSET	0xC04
 #define CRG_ISP_SEC_RSTDIS_OFFSET	0xC84
 
+#define CRG_RVBAR(c, n)                (0xE00 + (0x10 * c) + (0x4 * n))
 #define CRG_GENERAL_SEC_RSTEN_OFFSET 	0xE20
 #define CRG_GENERAL_SEC_RSTDIS_OFFSET 	0xE24
 #define IP_RST_GPIO0_SEC 		(1 << 2)
