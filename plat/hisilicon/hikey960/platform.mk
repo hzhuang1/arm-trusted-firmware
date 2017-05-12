@@ -28,7 +28,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-CRASH_CONSOLE_BASE		:=	PL011_UART5_BASE
+CRASH_CONSOLE_BASE		:=	PL011_UART6_BASE
 COLD_BOOT_SINGLE_CPU		:=	1
 PROGRAMMABLE_RESET_ADDRESS	:=	1
 PLAT_PARTITION_BLOCK_SIZE 	:= 	4096
@@ -77,10 +77,13 @@ BL2_SOURCES		+=	drivers/io/io_block.c			\
 				drivers/ufs/ufs.c			\
 				plat/common/aarch64/platform_up_stack.S	\
 				plat/hisilicon/hikey960/hikey960_bl2_setup.c \
-				plat/hisilicon/hikey960/hikey960_io_storage.c
+				plat/hisilicon/hikey960/hikey960_io_storage.c \
+				plat/hisilicon/hikey960/hikey960_mcu_load.c
 
 BL31_SOURCES		+=	drivers/arm/cci/cci.c			\
 				lib/cpus/aarch64/cortex_a53.S           \
+				lib/cpus/aarch64/cortex_a72.S		\
+				lib/cpus/aarch64/cortex_a73.S		\
 				plat/common/aarch64/platform_mp_stack.S \
 				plat/common/aarch64/plat_psci_common.c  \
 				plat/hisilicon/hikey960/aarch64/hikey960_helpers.S \
@@ -90,3 +93,5 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c			\
 				plat/hisilicon/hikey960/drivers/pwrc/hisi_pwrc.c \
 				plat/hisilicon/hikey960/drivers/ipc/hisi_ipc.c \
 				${HIKEY960_GIC_SOURCES}
+
+$(eval $(call FIP_ADD_IMG,SCP_BL2,--scp-fw))
