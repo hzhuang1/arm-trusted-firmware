@@ -28,6 +28,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <arch_helpers.h>
 #include <arm_gic.h>
 #include <assert.h>
 #include <bl_common.h>
@@ -115,6 +116,7 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 
 	/* Initialize CCI driver */
 	cci_init(CCI400_REG_BASE, cci_map, ARRAY_SIZE(cci_map));
+	cci_enable_snoop_dvm_reqs(MPIDR_AFFLVL1_VAL(read_mpidr_el1()));
 
 	/*
 	 * Copy BL3-2 and BL3-3 entry point information.
