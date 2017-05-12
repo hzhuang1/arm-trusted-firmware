@@ -87,4 +87,6 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c			\
 				plat/hisilicon/hikey960/hikey960_bl31_setup.c \
 				plat/hisilicon/hikey960/hikey960_pm.c	\
 				plat/hisilicon/hikey960/hikey960_topology.c \
+				plat/hisilicon/hikey960/drivers/pwrc/hisi_pwrc.c \
+				plat/hisilicon/hikey960/drivers/ipc/hisi_ipc.c \
 				${HIKEY960_GIC_SOURCES}
