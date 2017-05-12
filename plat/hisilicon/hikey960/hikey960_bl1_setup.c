@@ -148,8 +148,6 @@ void bl1_plat_arch_setup(void)
 
 static void hikey960_clk_init(void)
 {
-	//mmio_write_32(CRG_REG_BASE + CRG_CLKDIV3_OFFSET, 0xf0001000);
-
 	/* change ldi0 sel to ppll2 */
 	mmio_write_32(0xfff350b4, 0xf0002000);
 	/* ldi0 20' */
@@ -626,6 +624,12 @@ static void hikey960_tzc_init(void)
 	mmio_write_32(TZC_REG_BASE + TZC_EN8_OFFSET, 0x00000007);
 }
 
+static void hikey960_peri_init(void)
+{
+	/* unreset */
+	mmio_setbits_32(CRG_REG_BASE + CRG_PERRSTDIS4_OFFSET, 1);
+}
+
 /*
  * Function which will perform any remaining platform-specific setup that can
  * occur after the MMU and data cache have been enabled.
@@ -636,6 +640,7 @@ void bl1_platform_setup(void)
 	hikey960_pmu_init();
 	hikey960_regulator_enable();
 	hikey960_tzc_init();
+	hikey960_peri_init();
 	hikey960_ufs_init();
 	hikey960_io_setup();
 }
