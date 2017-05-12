@@ -45,14 +45,6 @@
 					DDR_SIZE,			\
 					MT_MEMORY | MT_RW | MT_NS)
 
-#define MAP_BL 		MAP_REGION_FLAT(BL1_RO_BASE, 			\
-					BL2_LIMIT - BL1_RO_BASE,	\
-					MT_DEVICE | MT_RW | MT_NS)
-
-#define MAP_FWU		MAP_REGION_FLAT(BL31_LIMIT,			\
-					0x000F0000,			\
-					MT_MEMORY | MT_RO | MT_SECURE | MT_EXECUTE)
-
 #define MAP_DEVICE	MAP_REGION_FLAT(DEVICE_BASE,			\
 					DEVICE_SIZE,			\
 					MT_DEVICE | MT_RW | MT_SECURE)
@@ -65,7 +57,6 @@
 #if IMAGE_BL1
 static const mmap_region_t hikey960_mmap[] = {
 	MAP_DDR,
-	MAP_BL,
 	MAP_DEVICE,
 	{0}
 };
@@ -74,16 +65,6 @@ static const mmap_region_t hikey960_mmap[] = {
 #if IMAGE_BL2 || IMAGE_BL31
 static const mmap_region_t hikey960_mmap[] = {
 	MAP_DDR,
-	MAP_DEVICE,
-	{0}
-};
-#endif
-
-#if IMAGE_BL2U
-static const mmap_region_t hikey960_mmap[] = {
-	MAP_DDR,
-	MAP_FWU,
-	MAP_BL,
 	MAP_DEVICE,
 	{0}
 };

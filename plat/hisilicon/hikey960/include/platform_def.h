@@ -81,33 +81,27 @@
 #define BL1_RW_SIZE			(0x00188000)
 #define BL1_RW_LIMIT			(0x1AD98000)
 
-#define NS_BL1U_BASE			(BL1_RW_BASE + 0x8000)	/* 1AC1_8000 */
-#define NS_BL1U_LIMIT			(NS_BL1U_BASE + 0x100000)
+/*
+ * BL2 specific defines.
+ */
+#define BL2_BASE			(BL1_RW_BASE + 0x8000)	/* 1AC1_8000 */
+#define BL2_LIMIT			(BL2_BASE + 0x40000)	/* 1AC5_8000 */
 
 /*
  * BL31 specific defines.
  */
-#define BL31_BASE			(NS_BL1U_LIMIT) 	/* 1AD1_8000 */
-#define BL31_LIMIT			(BL31_BASE + 0x40000) 	/* 1AD5_8000 */
+#define BL31_BASE			(BL2_LIMIT)		/* 1AC5_8000 */
+#define BL31_LIMIT			(BL31_BASE + 0x40000)	/* 1AC9_8000 */
 
-/*
- * BL2 specific defines.
- */
-#define BL2_BASE			(BL31_LIMIT)		/* 1AD5_8000 */
-#define BL2_LIMIT			(BL2_BASE + 0x40000) 	/* 1AD9_8000 */
+#define NS_BL1U_BASE			(BL31_LIMIT)		/* 1AC9_8000 */
+#define NS_BL1U_LIMIT			(NS_BL1U_BASE + 0x100000)
+
+#define HIKEY960_NS_IMAGE_OFFSET	(NS_BL1U_BASE)
 
 #define SCP_BL2_BASE			BL31_BASE
 
 #define SCP_MEM_BASE			(0x89C80000)
 #define SCP_MEM_SIZE			(0x00040000)
-
-#if 0
-/*
- * BL2U specific defines.
- */
-#define BL2U_BASE			BL2_BASE 		/* 1AC1_8000 */
-#define BL2U_LIMIT			(BL2U_BASE + 0x20000) 	/* 1AC3_8000 */
-#endif
 
 /*
  * Platform specific page table and MMU setup constants
@@ -119,8 +113,6 @@
 #endif
 
 #define MAX_MMAP_REGIONS		16
-
-#define HIKEY960_NS_IMAGE_OFFSET	(DDR_BASE + 0x1AC18000)
 
 /*
  * Declarations and constants to access the mailboxes safely. Each mailbox is
