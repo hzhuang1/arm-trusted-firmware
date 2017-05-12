@@ -67,6 +67,9 @@ void hikey960_pwr_domain_off(const psci_power_state_t *target_state)
  ******************************************************************************/
 static void __dead2 hikey960_system_reset(void)
 {
+	mmio_write_32(SCTRL_SCPEREN1_REG,
+		      SCPEREN1_WAIT_DDR_SELFREFRESH_DONE_BYPASS);
+	mmio_write_32(SCTRL_SCSYSSTAT_REG, 0xdeadbeef);
 	panic();
 }
 
