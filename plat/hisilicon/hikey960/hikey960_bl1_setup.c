@@ -630,6 +630,35 @@ static void hikey960_peri_init(void)
 	mmio_setbits_32(CRG_REG_BASE + CRG_PERRSTDIS4_OFFSET, 1);
 }
 
+static void hikey960_pinmux_init(void)
+{
+	unsigned int id;
+
+	hikey960_read_boardid(&id);
+	if (id == 5301) {
+		/* hikey960 hardware v2 */
+		/* GPIO150: LED */
+		mmio_write_32(IOMG_FIX_006_REG, 0);
+		/* GPIO151: LED */
+		mmio_write_32(IOMG_FIX_007_REG, 0);
+		/* GPIO189: LED */
+		mmio_write_32(IOMG_AO_011_REG, 0);
+		/* GPIO190: LED */
+		mmio_write_32(IOMG_AO_012_REG, 0);
+		/* GPIO46 */
+		mmio_write_32(IOMG_044_REG, 0);
+		/* GPIO202 */
+		mmio_write_32(IOMG_AO_023_REG, 0);
+		/* GPIO206 */
+		mmio_write_32(IOMG_AO_026_REG, 0);
+		/* GPIO219 - PD pullup */
+		mmio_write_32(IOMG_AO_039_REG, 0);
+		mmio_write_32(IOCG_AO_043_REG, 1 << 0);
+	}
+	/* GPIO005 - PMU SSI, 10mA */
+	mmio_write_32(IOCG_006_REG, 2 << 4);
+}
+
 /*
  * Function which will perform any remaining platform-specific setup that can
  * occur after the MMU and data cache have been enabled.
@@ -642,6 +671,7 @@ void bl1_platform_setup(void)
 	hikey960_tzc_init();
 	hikey960_peri_init();
 	hikey960_ufs_init();
+	hikey960_pinmux_init();
 	hikey960_io_setup();
 }
 
