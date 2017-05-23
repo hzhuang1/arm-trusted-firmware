@@ -183,6 +183,7 @@ int bl2_plat_handle_scp_bl2(image_info_t *scp_bl2_image_info)
 	INFO("BL2: SCP_BL2 transferred to SCP\n");
 
 	load_lpm3();
+	(void)buf;
 
 	return 0;
 }
