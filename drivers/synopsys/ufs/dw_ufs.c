@@ -113,6 +113,7 @@ static int dwufs_phy_init(ufs_params_t *params)
 	ufshc_dme_set(DL_AFC0_CREDIT_THRESHOLD_OFFSET, 0, 0);
 	ufshc_dme_set(DL_TC0_OUT_ACK_THRESHOLD_OFFSET, 0, 0);
 	ufshc_dme_set(DL_TC0_TX_FC_THRESHOLD_OFFSET, 0, 9);
+	(void)result;
 	return 0;
 }
 
@@ -193,6 +194,7 @@ static int dwufs_phy_set_pwr_mode(ufs_params_t *params)
 	} else {
 		WARN("ufs: HCS.UPMCRS error, HCS:0x%x\n", data);
 	}
+	(void)result;
 	return 0;
 }
 
