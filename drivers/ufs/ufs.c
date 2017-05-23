@@ -197,7 +197,7 @@ static int get_empty_slot(int *slot)
 static void get_utrd(utp_utrd_t *utrd)
 {
 	uintptr_t base;
-	int slot, result;
+	int slot = 0, result;
 	utrd_header_t *hd;
 
 	assert(utrd != NULL);
@@ -458,6 +458,8 @@ static int ufs_check_resp(utp_utrd_t *utrd, int trans_type)
 	assert((data & (1 << slot)) == 0);
 	assert(hd->ocs == OCS_SUCCESS);
 	assert((resp->trans_type & TRANS_TYPE_CODE_MASK) == trans_type);
+	(void)resp;
+	(void)slot;
 	return 0;
 }
 
@@ -780,5 +782,6 @@ int ufs_init(const ufs_ops_t *ops, ufs_params_t *params)
 	}
 
 	ufs_enum();
+	(void)result;
 	return 0;
 }
