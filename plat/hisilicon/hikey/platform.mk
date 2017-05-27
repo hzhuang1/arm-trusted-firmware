@@ -92,6 +92,8 @@ HIKEY_GIC_SOURCES	:=	drivers/arm/gic/common/gic_common.c	\
 				plat/common/plat_gicv2.c
 
 BL31_SOURCES		+=	drivers/arm/cci/cci.c			\
+				drivers/arm/sp804/sp804_delay_timer.c	\
+				drivers/delay_timer/delay_timer.c	\
 				lib/cpus/aarch64/cortex_a53.S		\
 				plat/common/aarch64/platform_mp_stack.S	\
 				plat/common/aarch64/plat_psci_common.c	\
